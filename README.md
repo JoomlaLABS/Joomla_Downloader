@@ -1,2 +1,2 @@
-# Joomla_Downloader
-Joomla! Downloader
+# Joomla! Downloader
+Joomla! Downloader script
