@@ -27,6 +27,7 @@ if( !isset($_GET['pkg']) && !isset($_GET['clear']) ) {
   //Joomla! Core update servers
   $updateUrls = array(
     'stable'        => 'https://update.joomla.org/core/sts/extension_sts.xml',
+    'maintenance'   => 'https://update.joomla.org/core/extension.xml',
     'test'          => 'https://update.joomla.org/core/test/extension_test.xml',
     'nightly-major' => 'https://update.joomla.org/core/nightlies/next_major_extension.xml',
     'nightly-minor' => 'https://update.joomla.org/core/nightlies/next_minor_extension.xml',
@@ -53,59 +54,63 @@ if( !isset($_GET['pkg']) && !isset($_GET['clear']) ) {
     $pkgs[$server] = $pkgsUpd;
   }
   foreach($pkgs as $server => $update) {
-    foreach($update as $pkg) {
-      $color;
-      $icon;
-      switch ($pkg['server']) {
-        case 'stable':
-          $color = 'text-success';
-          $icon = '<i class="fa-solid fa-box-archive fa-4x position-relative top-50 start-50 translate-middle py-4"></i>';
-          break;
-        case 'test':
-          $color = 'text-info';
-          $icon = '<i class="fa-solid fa-vial fa-4x position-relative top-50 start-50 translate-middle py-4"></i>';
-          break;
-        case 'nightly-major':
-          $color = 'text-warning';
-          $icon = '<span class="fa-layers fa-fw fa-4x position-relative top-50 start-50 translate-middle py-4"><i class="fa-solid fa-moon"></i><span class="bg-danger fa-layers-counter fa-layers-bottom-right" style="--fa-bottom: -2rem;">major</span></span>';
-          break;
-        case 'nightly-minor':
-          $color = 'text-warning';
-          $icon = '<span class="fa-layers fa-fw fa-4x position-relative top-50 start-50 translate-middle py-4"><i class="fa-solid fa-moon"></i><span class="bg-danger fa-layers-counter fa-layers-bottom-right" style="--fa-bottom: -2rem;">minor</span></span>';
-          break;
-        case 'nightly-patch':
-          $color = 'text-warning';
-          $icon = '<span class="fa-layers fa-fw fa-4x position-relative top-50 start-50 translate-middle py-4"><i class="fa-solid fa-moon"></i><span class="bg-danger fa-layers-counter fa-layers-bottom-right" style="--fa-bottom: -2rem;">patch</span></span>';
-          break;
-        default:
-          $color = 'text-secondary';
-          $icon = '<i class="fa-solid fa-question fa-4x position-relative top-50 start-50 translate-middle py-4"></i>';
-          break;
-      }
+    $pkg = $update[0];
+    $color;
+    $icon;
+    switch ($pkg['server']) {
+      case 'stable':
+        $color = 'text-success';
+        $icon = '<i class="fa-solid fa-box fa-fw fa-4x"></i>';
+        break;
+      case 'maintenance':
+        $color = 'text-success';
+        $icon = '<i class="fa-solid fa-box-archive fa-fw fa-4x"></i>';
+        break;
+      case 'test':
+        $color = 'text-info';
+        $icon = '<i class="fa-solid fa-vial fa-fw fa-4x"></i>';
+        break;
+      case 'nightly-major':
+        $color = 'text-warning';
+        $icon = '<span class="fa-layers fa-fw"><i class="fa-solid fa-moon fa-4x"></i><span class="bg-danger fa-4x fa-layers-counter fa-layers-bottom-left" style="--fa-bottom: -4rem;">major</span></span>';
+        break;
+      case 'nightly-minor':
+        $color = 'text-warning';
+        $icon = '<span class="fa-layers fa-fw"><i class="fa-solid fa-moon fa-4x"></i><span class="bg-danger fa-4x fa-layers-counter fa-layers-bottom-left" style="--fa-bottom: -4rem;">minor</span></span>';
+        break;
+      case 'nightly-patch':
+        $color = 'text-warning';
+        $icon = '<span class="fa-layers fa-fw"><i class="fa-solid fa-moon fa-4x"></i><span class="bg-danger fa-4x fa-layers-counter fa-layers-bottom-left" style="--fa-bottom: -4rem;">patch</span></span>';
+        break;
+      default:
+        $color = 'text-secondary';
+        $icon = '<i class="fa-solid fa-question fa-4x"></i>';
+        break;
+    }
 ?>
         <div class="col">
           <div id="<?php echo $pkg['server']; ?>_<?php echo $pkg['version']; ?>" class="card mb-4 h-100">
             <div class="row g-0">
-              <div class="col-md-3 <?php echo $color; ?>">
+              <div class="col-md-3 <?php echo $color; ?> text-center align-self-center py-4">
                 <?php echo $icon; ?>
               </div>
               <div class="col-md-9">
                 <div class="card-body">
                   <h5 class="card-title"><?php echo $pkg['name']; ?></h5>
                   <p class="card-text"><?php echo $pkg['description']; ?></p>
-                  <p class="card-text"><small class="text-muted">
-                    <i class="fa-brands fa-joomla"></i> <?php echo $pkg['version']; ?>
-                    <i class="fa-brands fa-php"></i> <?php echo $pkg['php']; ?>
-                    <i class="fa-solid fa-code-branch"></i> <?php echo $pkg['server']; ?>
-                  </small></p>
-                  <p class="card-text"><small class="text-muted"><i class="fa-solid fa-link"></i> <a href="joomla_downloader.php?pkg=<?php echo $pkg['url'] ?>" class="stretched-link"><?php echo $pkg['url'] ?></a></small></p>
+                  <ul class="card-text list-inline text-muted">
+                    <li class="list-inline-item"><i class="fa-brands fa-joomla"></i> <?php echo $pkg['version']; ?></li>
+                    <li class="list-inline-item"><i class="fa-brands fa-php"></i> <?php echo $pkg['php']; ?></li>
+                    <li class="list-inline-item"><i class="fa-solid fa-code-branch"></i> <?php echo $pkg['server']; ?></li>
+                  </ul>
+                  <p class="card-text"><small class="text-muted"><i class="fa-solid fa-download"></i> <?php echo $pkg['url'] ?></small></p>
+                  <a href="joomla_downloader.php?pkg=<?php echo $pkg['url'] ?>" class="btn btn-primary stretched-link"><i class="fa-solid fa-caret-right"></i> Install</a>
                 </div>
               </div>
             </div>
           </div>
         </div>
 <?php
-    }
   }
 ?>
       </div>
