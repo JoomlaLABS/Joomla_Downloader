@@ -1,4 +1,7 @@
 <!doctype html>
+<?php
+  $thisRelease = 'v1.0.0';
+?>
 <html lang="en" data-bs-theme="dark">
   <head>
     <meta charset="utf-8">
@@ -166,6 +169,39 @@ if( !isset($_GET['pkg']) && !isset($_GET['clear']) ) {
 <?php
 }
 ?>
+    <div class="d-flex flex-column flex-md-row p-4 gap-4 py-md-5 align-items-center justify-content-center">
+<?php
+  $ch = curl_init();
+  curl_setopt($ch, CURLOPT_URL, 'https://api.github.com/repos/JoomlaLABS/Joomla_Downloader/releases/latest');
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+  curl_setopt($ch, CURLOPT_USERAGENT, 'Joomla!LABS User Agent');
+  $lastRelease = curl_exec($ch);
+  curl_close($ch);
+  $lastRelease = json_decode($lastRelease)->tag_name;
+?>
+      <p class='text-center'>
+<?php
+  switch (version_compare ($thisRelease , $lastRelease)) {
+    case 0:
+      echo "<span class=\"text-muted\">$thisRelease</span>";
+      break;
+
+    case -1:
+      echo "<span class=\"text-muted\">$thisRelease</span><br><a class=\"text-danger\" href=\"https://github.com/JoomlaLABS/Joomla_Downloader/releases/latest\" target=\"_blank\">$lastRelease aviable</a>";
+      break;
+
+    case 1:
+      echo "<span class=\"text-warning\">$thisRelease</span><br><span class=\"text-muted\">$lastRelease is the latest</span>";
+      break;
+
+    default:
+      // code...
+      break;
+  }
+?>
+      </p>
+      <p class="text-muted">Joomla!LABS and this file is not affiliated with or endorsed by The Joomla! Project™. Any products and services provided through this file are not supported or warrantied by The Joomla! Project or Open Source Matters, Inc. Use of the Joomla!® name, symbol, logo and related trademarks is permitted under a limited license granted by Open Source Matters, Inc.</p>
+    </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ENjdO4Dr2bkBIFxQpeoTz1HIcje39Wm4jDKdf19U8gI4ddQ3GYNS7NTKfAdVQSZe" crossorigin="anonymous"></script>
   </body>
 </html>
