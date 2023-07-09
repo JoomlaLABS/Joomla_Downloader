@@ -1,6 +1,6 @@
 <!doctype html>
 <?php
-  $thisRelease = 'v1.0.1';
+  $thisRelease = 'v1.0.2';
 ?>
 <html lang="en" class="h-100" data-bs-theme="dark">
   <head>
@@ -160,41 +160,54 @@ if( !isset($_GET['pkg']) && !isset($_GET['clear']) ) {
     <footer class="footer mt-auto py-3 bg-body-tertiary">
       <div class="container-fluid">
         <div class="row">
+          <div class='col col-12 col-md-2 text-center align-self-center py-2'>
 <?php
   $ch = curl_init();
   curl_setopt($ch, CURLOPT_URL, 'https://api.github.com/repos/JoomlaLABS/Joomla_Downloader/releases/latest');
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
   curl_setopt($ch, CURLOPT_USERAGENT, 'Joomla!LABS User Agent');
+  curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+  curl_setopt($ch, CURLOPT_FAILONERROR, true);
   $lastRelease = curl_exec($ch);
+  if (curl_errno($ch)) {
+    $error_msg = curl_error($ch);
+  }
   curl_close($ch);
-  $lastRelease = json_decode($lastRelease)->tag_name;
-?>
-          <div class='col col-12 col-md-2 text-center align-self-center py-2'>
-<?php
-  switch (version_compare ($thisRelease , $lastRelease)) {
-    case 0:
+  if ($lastRelease == false) {
 ?>
             <p class="text-muted mb-0"><?php echo $thisRelease; ?></p>
+            <p><?php echo $error_msg; ?></p>
+            
 <?php
-      break;
+  } else {
+    $lastRelease = json_decode($lastRelease)->tag_name;
 
-    case -1:
+    switch (version_compare ($thisRelease , $lastRelease)) {
+      case 0:
+?>
+            <p class="text-muted mb-0"><?php echo $thisRelease; ?></p>
+            <p class="text-muted mb-0">the latest</p>
+<?php
+        break;
+
+      case -1:
 ?>
             <p class="text-muted mb-0"><?php echo $thisRelease; ?></p>
             <p><a class="text-danger mb-0" href="https://github.com/JoomlaLABS/Joomla_Downloader/releases/latest" target="_blank"><?php echo $lastRelease; ?> aviable</a></p>
 <?php
-      break;
+        break;
 
-    case 1:
+      case 1:
 ?>
             <p class="text-warning mb-0"><?php echo $thisRelease; ?></p>
             <p class="text-muted mb-0"><?php echo $lastRelease; ?> is the latest</p>
 <?php
-      break;
+        break;
 
-    default:
-      // code...
-      break;
+      default:
+        // code...
+        break;
+    }
   }
 ?>
           </div>
@@ -236,4 +249,3 @@ if( !isset($_GET['pkg']) && !isset($_GET['clear']) ) {
     });
     return $pkgsUpd[0];
   }
- 
