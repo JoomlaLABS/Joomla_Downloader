@@ -1,6 +1,6 @@
 <!doctype html>
 <?php
-  $thisRelease = 'v1.0.2';
+  $thisRelease = 'v1.1.0';
 ?>
 <html lang="en" class="h-100" data-bs-theme="dark">
   <head>
@@ -31,18 +31,18 @@ if( !isset($_GET['pkg']) && !isset($_GET['clear']) ) {
       <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 py-4 m-0">
 <?php
   //Joomla! Core update servers types
-  $updateServers = array('stable', 'maintenance', 'test', 'nightly-major', 'nightly-minor', 'nightly-patch');
+  $updateServers = array('j5', 'j4', 'test', 'nightly-major', 'nightly-minor', 'nightly-patch');
   $pkgs = array();
   foreach ($updateServers as $server) {
     $pkg = lastPkg($server);
     $color;
     $icon;
     switch ($pkg['server']) {
-      case 'stable':
+      case 'j5':
         $color = 'text-success';
         $icon = '<i class="fa-solid fa-box fa-fw fa-4x"></i>';
         break;
-      case 'maintenance':
+      case 'j4':
         $color = 'text-success';
         $icon = '<i class="fa-solid fa-box-archive fa-fw fa-4x"></i>';
         break;
@@ -227,6 +227,8 @@ if( !isset($_GET['pkg']) && !isset($_GET['clear']) ) {
     $updateUrls = array(
       'stable'        => 'https://update.joomla.org/core/sts/extension_sts.xml',
       'maintenance'   => 'https://update.joomla.org/core/extension.xml',
+      'j4'            => 'https://update.joomla.org/core/j4/default.xml',
+      'j5'            => 'https://update.joomla.org/core/j5/default.xml',
       'test'          => 'https://update.joomla.org/core/test/extension_test.xml',
       'nightly-major' => 'https://update.joomla.org/core/nightlies/next_major_extension.xml',
       'nightly-minor' => 'https://update.joomla.org/core/nightlies/next_minor_extension.xml',
