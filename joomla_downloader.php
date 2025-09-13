@@ -1,6 +1,6 @@
 <!doctype html>
 <?php
-  $thisRelease = 'v1.1.0';
+  $thisRelease = 'v1.2.0';
 ?>
 <html lang="en" class="h-100" data-bs-theme="dark">
   <head>
@@ -25,7 +25,17 @@
       </div>
     </header>
 <?php
-if( !isset($_GET['pkg']) && !isset($_GET['clear']) ) {
+// Validation and sanitization of GET parameters
+$allowedPackages = array('j5', 'j4', 'test', 'nightly-major', 'nightly-minor', 'nightly-patch');
+$pkg = isset($_GET['pkg']) ? trim($_GET['pkg']) : null;
+$clear = isset($_GET['clear']);
+
+// Validation of pkg parameter
+if ($pkg !== null && !in_array($pkg, $allowedPackages)) {
+    $pkg = null; // Reset if invalid
+}
+
+if( !$pkg && !$clear ) {
 ?>
     <main class="flex-shrink-0">
       <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 py-4 m-0">
@@ -35,6 +45,12 @@ if( !isset($_GET['pkg']) && !isset($_GET['clear']) ) {
   $pkgs = array();
   foreach ($updateServers as $server) {
     $pkg = lastPkg($server);
+    
+    // Skip only if completely empty or missing essential data
+    if (empty($pkg) || !isset($pkg['name']) || !isset($pkg['version']) || empty($pkg['url'])) {
+      continue;
+    }
+    
     $color;
     $icon;
     switch ($pkg['server']) {
@@ -96,36 +112,85 @@ if( !isset($_GET['pkg']) && !isset($_GET['clear']) ) {
       </div>
     </main>
 <?php
-} elseif ( isset($_GET['pkg']) && !isset($_GET['clear']) ) {
-  $pkg = $_GET['pkg'];
-
-  $pkgUrl = lastPkg($pkg)['url'];
+} elseif ( $pkg && !$clear ) {
+  // Use the already validated variable
+  $pkgData = lastPkg($pkg);
+  
+  // Additional URL validation
+  if (!$pkgData || !isset($pkgData['url']) || !filter_var($pkgData['url'], FILTER_VALIDATE_URL)) {
+    die('Error: Invalid package URL.');
+  }
+  
+  $pkgUrl = $pkgData['url'];
+  
+  // Verify that the URL is from authorized domains
+  $authorizedDomains = ['update.joomla.org', 'downloads.joomla.org', 'developer.joomla.org', 'github.com'];
+  $urlParts = parse_url($pkgUrl);
+  if (!in_array($urlParts['host'], $authorizedDomains)) {
+    die('Error: Unauthorized domain.');
+  }
 ?>
     <main class="flex-shrink-0">
       <div class="container">
         <p class="lead">
-          <?php echo "Downloading <code>$pkgUrl</code> . . ."; ?>
+          <?php echo "Downloading <code>" . htmlspecialchars($pkgUrl, ENT_QUOTES, 'UTF-8') . "</code> . . ."; ?>
         </p>
 <?php
-  $pkg = getcwd().DIRECTORY_SEPARATOR.basename($pkgUrl);
-  file_put_contents($pkg, file_get_contents($pkgUrl));
-?>
-        <p class="lead">
-          <?php echo "Unzipping <code>$pkg</code> . . ."; ?>
-        </p>
-<?php
-  $zip = new ZipArchive;
-  $res = $zip->open($pkg);
-  if ($res === TRUE) {
-    $zip->extractTo(getcwd().DIRECTORY_SEPARATOR); // extract the zip file
-    $zip->close();
+  $pkgFileName = basename($pkgUrl);
+  
+  // File name validation
+  if (!preg_match('/^[a-zA-Z0-9._-]+\.zip$/', $pkgFileName)) {
+    die('Error: Invalid file name.');
+  }
+  
+  $pkgPath = getcwd() . DIRECTORY_SEPARATOR . $pkgFileName;
+  
+  // Download with improved error handling
+  $fileContent = file_get_contents($pkgUrl);
+  if ($fileContent === false) {
+    die('Error: Unable to download file.');
+  }
+  
+  $bytesWritten = file_put_contents($pkgPath, $fileContent);
+  if ($bytesWritten === false) {
+    die('Error: Unable to save file.');
   }
 ?>
         <p class="lead">
-          <?php echo "Deleting <code>$pkg</code> . . ."; ?>
+          <?php echo "Unzipping <code>" . htmlspecialchars($pkgFileName, ENT_QUOTES, 'UTF-8') . "</code> . . ."; ?>
         </p>
 <?php
-  unlink($pkg); // delete zip file
+  $zip = new ZipArchive;
+  $res = $zip->open($pkgPath);
+  if ($res === TRUE) {
+    // Validate files in archive before extraction
+    $extractPath = getcwd() . DIRECTORY_SEPARATOR;
+    
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+      $filename = $zip->getNameIndex($i);
+      
+      // Directory traversal prevention
+      if (strpos($filename, '..') !== false || strpos($filename, '/') === 0) {
+        $zip->close();
+        unlink($pkgPath);
+        die('Error: Archive contains unsafe paths.');
+      }
+    }
+    
+    $zip->extractTo($extractPath);
+    $zip->close();
+  } else {
+    unlink($pkgPath);
+    die('Error: Unable to open ZIP archive.');
+  }
+?>
+        <p class="lead">
+          <?php echo "Deleting <code>" . htmlspecialchars($pkgFileName, ENT_QUOTES, 'UTF-8') . "</code> . . ."; ?>
+        </p>
+<?php
+  if (file_exists($pkgPath) && !unlink($pkgPath)) {
+    echo '<div class="alert alert-warning" role="alert">Warning: Unable to delete ZIP file.</div>';
+  }
 ?>
         <div class="alert alert-success" role="alert">
           All done!
@@ -136,7 +201,7 @@ if( !isset($_GET['pkg']) && !isset($_GET['clear']) ) {
       </div>
     </main>
 <?php
-} elseif ( !isset($_GET['pkg']) && isset($_GET['clear']) ) {
+} elseif ( !$pkg && $clear ) {
 ?>
     <main class="flex-shrink-0">
       <div class="container">
@@ -162,53 +227,108 @@ if( !isset($_GET['pkg']) && !isset($_GET['clear']) ) {
         <div class="row">
           <div class='col col-12 col-md-2 text-center align-self-center py-2'>
 <?php
-  $ch = curl_init();
-  curl_setopt($ch, CURLOPT_URL, 'https://api.github.com/repos/JoomlaLABS/Joomla_Downloader/releases/latest');
-  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-  curl_setopt($ch, CURLOPT_USERAGENT, 'Joomla!LABS User Agent');
-  curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-  curl_setopt($ch, CURLOPT_FAILONERROR, true);
-  $lastRelease = curl_exec($ch);
-  if (curl_errno($ch)) {
-    $error_msg = curl_error($ch);
+  // Function to get release info with improved error handling
+  function getLatestReleaseInfo($currentVersion) {
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+      CURLOPT_URL => 'https://api.github.com/repos/JoomlaLABS/Joomla_Downloader/releases/latest',
+      CURLOPT_RETURNTRANSFER => true,
+      CURLOPT_USERAGENT => 'Joomla!LABS User Agent',
+      CURLOPT_FOLLOWLOCATION => true,
+      CURLOPT_FAILONERROR => true,
+      CURLOPT_TIMEOUT => 10,
+      CURLOPT_CONNECTTIMEOUT => 5
+    ]);
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
+    curl_close($ch);
+    
+    // Handle cURL errors
+    if ($response === false || !empty($error)) {
+      return [
+        'success' => false, 
+        'error' => $error ?: 'Network error',
+        'current' => $currentVersion
+      ];
+    }
+    
+    // Handle HTTP errors
+    if ($httpCode !== 200) {
+      return [
+        'success' => false, 
+        'error' => "HTTP $httpCode error",
+        'current' => $currentVersion
+      ];
+    }
+    
+    // Parse JSON response
+    $data = json_decode($response, true);
+    if (json_last_error() !== JSON_ERROR_NONE || !isset($data['tag_name'])) {
+      return [
+        'success' => false, 
+        'error' => 'Invalid JSON response',
+        'current' => $currentVersion
+      ];
+    }
+    
+    $latestVersion = $data['tag_name'];
+    $comparison = version_compare($currentVersion, $latestVersion);
+    
+    return [
+      'success' => true,
+      'current' => $currentVersion,
+      'latest' => $latestVersion,
+      'comparison' => $comparison,
+      'url' => 'https://github.com/JoomlaLABS/Joomla_Downloader/releases/latest'
+    ];
   }
-  curl_close($ch);
-  if ($lastRelease == false) {
-?>
-            <p class="text-muted mb-0"><?php echo $thisRelease; ?></p>
-            <p><?php echo $error_msg; ?></p>
-            
-<?php
-  } else {
-    $lastRelease = json_decode($lastRelease)->tag_name;
-
-    switch (version_compare ($thisRelease , $lastRelease)) {
-      case 0:
-?>
-            <p class="text-muted mb-0"><?php echo $thisRelease; ?></p>
-            <p class="text-muted mb-0">the latest</p>
-<?php
-        break;
-
-      case -1:
-?>
-            <p class="text-muted mb-0"><?php echo $thisRelease; ?></p>
-            <p><a class="text-danger mb-0" href="https://github.com/JoomlaLABS/Joomla_Downloader/releases/latest" target="_blank"><?php echo $lastRelease; ?> aviable</a></p>
-<?php
-        break;
-
-      case 1:
-?>
-            <p class="text-warning mb-0"><?php echo $thisRelease; ?></p>
-            <p class="text-muted mb-0"><?php echo $lastRelease; ?> is the latest</p>
-<?php
-        break;
-
+  
+  // Function to render version status
+  function renderVersionStatus($releaseInfo) {
+    if (!$releaseInfo['success']) {
+      return sprintf(
+        '<p class="text-muted mb-0">%s</p><p class="text-warning mb-0">%s</p>',
+        htmlspecialchars($releaseInfo['current'], ENT_QUOTES, 'UTF-8'),
+        htmlspecialchars($releaseInfo['error'], ENT_QUOTES, 'UTF-8')
+      );
+    }
+    
+    $current = htmlspecialchars($releaseInfo['current'], ENT_QUOTES, 'UTF-8');
+    $latest = htmlspecialchars($releaseInfo['latest'], ENT_QUOTES, 'UTF-8');
+    $url = htmlspecialchars($releaseInfo['url'], ENT_QUOTES, 'UTF-8');
+    
+    switch ($releaseInfo['comparison']) {
+      case 0: // Same version
+        return sprintf(
+          '<p class="text-muted mb-0">%s</p><p class="text-muted mb-0">the latest</p>',
+          $current
+        );
+        
+      case -1: // Current is older
+        return sprintf(
+          '<p class="text-muted mb-0">%s</p><p><a class="text-danger mb-0" href="%s" target="_blank">%s available</a></p>',
+          $current, $url, $latest
+        );
+        
+      case 1: // Current is newer (development)
+        return sprintf(
+          '<p class="text-warning mb-0">%s</p><p class="text-muted mb-0">%s is the latest</p>',
+          $current, $latest
+        );
+        
       default:
-        // code...
-        break;
+        return sprintf(
+          '<p class="text-muted mb-0">%s</p><p class="text-muted mb-0">Version check failed</p>',
+          $current
+        );
     }
   }
+  
+  // Get and display release information
+  $releaseInfo = getLatestReleaseInfo($thisRelease);
+  echo renderVersionStatus($releaseInfo);
 ?>
           </div>
           <div class='col col-12 col-md-10 align-self-center'>
@@ -234,20 +354,133 @@ if( !isset($_GET['pkg']) && !isset($_GET['clear']) ) {
       'nightly-minor' => 'https://update.joomla.org/core/nightlies/next_minor_extension.xml',
       'nightly-patch' => 'https://update.joomla.org/core/nightlies/next_patch_extension.xml'
     );
-    $context  = stream_context_create(array('http' => array('header' => 'Accept: application/xml')));
+    
+    // Server validation
+    if (!array_key_exists($server, $updateUrls)) {
+      return array();
+    }
+    
+    $context = stream_context_create(array(
+      'http' => array(
+        'header' => 'Accept: application/xml',
+        'timeout' => 30,
+        'user_agent' => 'Joomla!LABS Downloader'
+      )
+    ));
+    
     $xml = file_get_contents($updateUrls[$server], false, $context);
-    $xml = simplexml_load_string($xml);
+    if ($xml === false) {
+      return array();
+    }
+    
+    // Prevent XXE attacks using secure XML loading with modern approach
+    $prevUseInternalErrors = libxml_use_internal_errors(true);
+    
+    // Load XML with security flags to prevent XXE
+    $xml = simplexml_load_string($xml, 'SimpleXMLElement', LIBXML_NONET);
+    
+    // Restore previous settings
+    libxml_use_internal_errors($prevUseInternalErrors);
+    
+    if ($xml === false || !isset($xml->update)) {
+      return array();
+    }
+    
     $pkgsUpd = array();
     foreach($xml->update as $update) {
-      $pkgsUpd[(string)$update->version]['name'] = $update->name;
-      $pkgsUpd[(string)$update->version]['version'] = $update->version;
-      $pkgsUpd[(string)$update->version]['server'] = $server;
-      $pkgsUpd[(string)$update->version]['description'] = $update->description;
-      $pkgsUpd[(string)$update->version]['php'] = $update->php_minimum;
-      $pkgsUpd[(string)$update->version]['url'] = str_replace('Update_Package.zip', 'Full_Package.zip', $update->downloads->downloadurl);
+      // Validation and sanitization of XML data
+      $version = (string)$update->version;
+      
+      // Check if downloadurl exists in the XML structure
+      $url = '';
+      if (isset($update->downloads->downloadurl)) {
+        $url = (string)$update->downloads->downloadurl;
+      } elseif (isset($update->downloadurl)) {
+        $url = (string)$update->downloadurl;
+      } else {
+        continue; // Skip if no download URL found
+      }
+      
+      // URL validation
+      if (!filter_var($url, FILTER_VALIDATE_URL)) {
+        continue;
+      }
+      
+      // Verify that the URL is from authorized Joomla domains
+      $urlParts = parse_url($url);
+      $authorizedDomains = [
+        'update.joomla.org', 
+        'downloads.joomla.org', 
+        'developer.joomla.org',
+        'github.com'
+      ];
+      
+      if (!isset($urlParts['host']) || !in_array($urlParts['host'], $authorizedDomains)) {
+        continue;
+      }
+      
+      // Test multiple URL patterns for maximum compatibility
+      $urlsToTest = [];
+      
+      // Pattern 1: Direct Full Package URL (works for most cases)
+      $fullPackageUrl = str_replace('Update_Package.zip', 'Full_Package.zip', $url);
+      $urlsToTest[] = $fullPackageUrl;
+      
+      // Pattern 2: update.joomla.org format (for downloads.joomla.org URLs)
+      if (strpos($url, 'downloads.joomla.org') !== false) {
+        // Extract version from URL like /5-3-3/ or /4-4-13/
+        if (preg_match('/\/(\d+-\d+-\d+)\//', $url, $matches)) {
+          $versionPath = str_replace('-', '.', $matches[1]);
+          $updateUrl = "https://update.joomla.org/releases/$versionPath/Joomla_$versionPath-Stable-Full_Package.zip";
+          $urlsToTest[] = $updateUrl;
+        }
+      }
+      
+      // Pattern 3: GitHub releases pattern (for github.com URLs)
+      if (strpos($url, 'github.com') !== false) {
+        // GitHub pattern: change -Update_Package to -Full_Package
+        $githubUrl = str_replace('-Update_Package.zip', '-Full_Package.zip', $url);
+        if ($githubUrl !== $url) {
+          $urlsToTest[] = $githubUrl;
+        }
+      }
+      
+      // Pattern 4: Alternative dash format
+      $altUrl = preg_replace('/Joomla_(\d+)\.(\d+)\.(\d+)/', 'Joomla_$1-$2-$3', $fullPackageUrl);
+      if ($altUrl !== $fullPackageUrl) {
+        $urlsToTest[] = $altUrl;
+      }
+      
+      $validUrl = null;
+      foreach ($urlsToTest as $testUrl) {
+        $headers = @get_headers($testUrl, 1);
+        // Accept both 200 (OK) and 302 (Found/Redirect) as valid responses
+        $urlExists = $headers && (strpos($headers[0], '200') !== false || strpos($headers[0], '302') !== false);
+        
+        if ($urlExists) {
+          $validUrl = $testUrl;
+          break;
+        }
+      }
+      
+      if ($validUrl) {
+        // Only create package entry if we have a valid URL
+        $pkgsUpd[$version]['name'] = (string)$update->name;
+        $pkgsUpd[$version]['version'] = $version;
+        $pkgsUpd[$version]['server'] = $server;
+        $pkgsUpd[$version]['description'] = (string)$update->description;
+        $pkgsUpd[$version]['php'] = (string)$update->php_minimum;
+        $pkgsUpd[$version]['url'] = $validUrl;
+      }
+      // If no valid URL found, skip this package (continue to next iteration)
     }
+    
+    if (empty($pkgsUpd)) {
+      return array();
+    }
+    
     usort($pkgsUpd, function($a,$b) {
-      return -1 * version_compare ( $a['version'] , $b['version'] );
+      return -1 * version_compare($a['version'], $b['version']);
     });
     return $pkgsUpd[0];
   }
