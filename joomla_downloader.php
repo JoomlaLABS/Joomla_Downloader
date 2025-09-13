@@ -215,7 +215,14 @@ if( !$pkg && !$clear ) {
           All done!
         </div>
         <div class="d-grid gap-2 col-6 mx-auto pt-5">
-          <a class="btn btn-success btn-lg" href="<?php echo str_replace(basename($_SERVER["SCRIPT_NAME"]), "", $_SERVER["SCRIPT_URI"]) ?>" role="button">Install Joomla!</a>
+          <a class="btn btn-success btn-lg" href="<?php 
+            // Build URL in a compatible way for all server environments
+            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $scriptDir = dirname($_SERVER['SCRIPT_NAME']);
+            $baseUrl = $protocol . '://' . $host . $scriptDir;
+            echo rtrim($baseUrl, '/') . '/';
+          ?>" role="button">Install Joomla!</a>
         </div>
       </div>
     </main>
