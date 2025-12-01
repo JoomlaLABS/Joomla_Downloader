@@ -1,6 +1,6 @@
 <!doctype html>
 <?php
-  $thisRelease = 'v1.2.0';
+  $thisRelease = 'v2.0.0';
 ?>
 <html lang="en" class="h-100" data-bs-theme="dark">
   <head>
@@ -26,26 +26,35 @@
     </header>
 <?php
 // Validation and sanitization of GET parameters
-$allowedPackages = array('j5', 'j4', 'test', 'nightly-major', 'nightly-minor', 'nightly-patch');
-$pkg = isset($_GET['pkg']) ? trim($_GET['pkg']) : null;
+$allowedServers = array('targets', 'nightly-major', 'nightly-minor', 'nightly-patch');
+$server = isset($_GET['server']) ? trim($_GET['server']) : null;
+$channel = isset($_GET['channel']) ? trim($_GET['channel']) : null;
+$stability = isset($_GET['stability']) ? trim($_GET['stability']) : null;
 $clear = isset($_GET['clear']);
 
-// Validation of pkg parameter
-if ($pkg !== null && !in_array($pkg, $allowedPackages)) {
-    $pkg = null; // Reset if invalid
+// Validation of server parameter
+if ($server !== null && !in_array($server, $allowedServers)) {
+    $server = null; // Reset if invalid
 }
 
-if( !$pkg && !$clear ) {
+if( !$server && !$clear ) {
 ?>
     <main class="flex-shrink-0">
       <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 py-4 m-0">
 <?php
   //Joomla! Core update servers types
-  $updateServers = array('j5', 'j4', 'test', 'nightly-major', 'nightly-minor', 'nightly-patch');
   $pkgs = array();
-  foreach ($updateServers as $server) {
-    $pkg = lastPkg($server);
-    
+  $pkgs[] = lastPkg('targets');
+  $pkgs[] = lastPkg('targets', '5.x');
+  $pkgs[] = lastPkg('targets', null, 'RC');
+  $pkgs[] = lastPkg('nightly-major');
+  $pkgs[] = lastPkg('nightly-minor');
+  $pkgs[] = lastPkg('nightly-patch');
+  
+  // Save reference to last targets call for icon comparison
+  $lastTargetsPkg = lastPkg('targets');
+  
+  foreach ($pkgs as $pkg) {
     // Skip only if completely empty or missing essential data
     if (empty($pkg) || !isset($pkg['name']) || !isset($pkg['version']) || empty($pkg['url'])) {
       continue;
@@ -53,35 +62,52 @@ if( !$pkg && !$clear ) {
     
     $color;
     $icon;
-    switch ($pkg['server']) {
-      case 'j5':
-        $color = 'text-success';
+    
+    // Determine icon and color based on server, stability, and branch
+    $server = isset($pkg['server']) ? $pkg['server'] : '';
+    $stability = isset($pkg['stability']) ? $pkg['stability'] : '';
+    $branch = isset($pkg['branch']) ? $pkg['branch'] : '';
+    
+    // Priority 1: Check server for nightly versions
+    if (in_array($server, ['nightly-major', 'nightly-minor', 'nightly-patch'])) {
+      $color = 'text-warning';
+      switch ($server) {
+        case 'nightly-major':
+          $icon = '<span class="fa-layers fa-fw"><i class="fa-solid fa-moon fa-4x"></i><span class="bg-danger fa-4x fa-layers-counter fa-layers-bottom-left" style="--fa-bottom: -4rem;">major</span></span>';
+          break;
+        case 'nightly-minor':
+          $icon = '<span class="fa-layers fa-fw"><i class="fa-solid fa-moon fa-4x"></i><span class="bg-danger fa-4x fa-layers-counter fa-layers-bottom-left" style="--fa-bottom: -4rem;">minor</span></span>';
+          break;
+        case 'nightly-patch':
+          $icon = '<span class="fa-layers fa-fw"><i class="fa-solid fa-moon fa-4x"></i><span class="bg-danger fa-4x fa-layers-counter fa-layers-bottom-left" style="--fa-bottom: -4rem;">patch</span></span>';
+          break;
+      }
+    }
+    // Priority 2: Check server for test or check stability for RC
+    elseif ($server === 'test' || strtolower($stability) === 'rc' || strtolower($branch) === 'test') {
+      $color = 'text-info';
+      $icon = '<i class="fa-solid fa-vial fa-fw fa-4x"></i>';
+    }
+    // Priority 3: Check server for stable repositories (use fa-box-archive)
+    elseif (in_array($server, ['stable', 'maintenance', 'j4', 'j5'])) {
+      $color = 'text-success';
+      $icon = '<i class="fa-solid fa-box-archive fa-fw fa-4x"></i>';
+    }
+    // Priority 4: Check if server is 'targets'
+    elseif ($server === 'targets') {
+      $color = 'text-success';
+      // If this package is the same as the last targets call (lastPkg('targets')), use fa-box
+      if ($pkg === $lastTargetsPkg) {
         $icon = '<i class="fa-solid fa-box fa-fw fa-4x"></i>';
-        break;
-      case 'j4':
-        $color = 'text-success';
+      } else {
+        // Otherwise use fa-box-archive
         $icon = '<i class="fa-solid fa-box-archive fa-fw fa-4x"></i>';
-        break;
-      case 'test':
-        $color = 'text-info';
-        $icon = '<i class="fa-solid fa-vial fa-fw fa-4x"></i>';
-        break;
-      case 'nightly-major':
-        $color = 'text-warning';
-        $icon = '<span class="fa-layers fa-fw"><i class="fa-solid fa-moon fa-4x"></i><span class="bg-danger fa-4x fa-layers-counter fa-layers-bottom-left" style="--fa-bottom: -4rem;">major</span></span>';
-        break;
-      case 'nightly-minor':
-        $color = 'text-warning';
-        $icon = '<span class="fa-layers fa-fw"><i class="fa-solid fa-moon fa-4x"></i><span class="bg-danger fa-4x fa-layers-counter fa-layers-bottom-left" style="--fa-bottom: -4rem;">minor</span></span>';
-        break;
-      case 'nightly-patch':
-        $color = 'text-warning';
-        $icon = '<span class="fa-layers fa-fw"><i class="fa-solid fa-moon fa-4x"></i><span class="bg-danger fa-4x fa-layers-counter fa-layers-bottom-left" style="--fa-bottom: -4rem;">patch</span></span>';
-        break;
-      default:
-        $color = 'text-secondary';
-        $icon = '<i class="fa-solid fa-question fa-4x"></i>';
-        break;
+      }
+    }
+    // Default fallback
+    else {
+      $color = 'text-secondary';
+      $icon = '<i class="fa-solid fa-question fa-4x"></i>';
     }
 ?>
         <div class="col">
@@ -94,13 +120,53 @@ if( !$pkg && !$clear ) {
                 <div class="card-body">
                   <h5 class="card-title"><?php echo $pkg['name']; ?></h5>
                   <p class="card-text"><?php echo $pkg['description']; ?></p>
-                  <ul class="card-text list-inline text-muted">
+                  <?php
+                  // Format supported databases
+                  $dbText = '';
+                  if (!empty($pkg['supported_databases'])) {
+                    $dbParts = [];
+                    if (isset($pkg['supported_databases']['mariadb'])) {
+                      $dbParts[] = 'mariadb: ' . $pkg['supported_databases']['mariadb'];
+                    }
+                    if (isset($pkg['supported_databases']['mysql'])) {
+                      $dbParts[] = 'mysql: ' . $pkg['supported_databases']['mysql'];
+                    }
+                    if (isset($pkg['supported_databases']['postgresql'])) {
+                      $dbParts[] = 'postgresql: ' . $pkg['supported_databases']['postgresql'];
+                    }
+                    $dbText = implode(' | ', $dbParts);
+                  }
+                  ?>
+                  <ul class="card-text list-inline text-muted small">
                     <li class="list-inline-item"><i class="fa-brands fa-joomla"></i> <?php echo $pkg['version']; ?></li>
+                    <li class="list-inline-item"><i class="fa-solid fa-code-branch"></i> <?php echo $pkg['branch']; ?></li>
+                    <?php if (!empty($pkg['stability'])): ?>
+                    <li class="list-inline-item"><i class="fa-solid fa-layer-group"></i> <?php echo $pkg['stability']; ?></li>
+                    <?php endif; ?>
+                  </ul>
+                  <ul class="card-text list-inline text-muted small">
                     <li class="list-inline-item"><i class="fa-brands fa-php"></i> <?php echo $pkg['php']; ?></li>
-                    <li class="list-inline-item"><i class="fa-solid fa-code-branch"></i> <?php echo $pkg['server']; ?></li>
+                    <?php if ($dbText): ?>
+                    <li class="list-inline-item"><i class="fa-solid fa-database"></i> <?php echo $dbText; ?></li>
+                    <?php endif; ?>
                   </ul>
                   <p class="card-text"><small class="text-muted"><i class="fa-solid fa-download"></i> <?php echo $pkg['url'] ?></small></p>
-                  <a href="joomla_downloader.php?pkg=<?php echo $server; ?>" class="btn btn-primary stretched-link"><i class="fa-solid fa-caret-right"></i> Install</a>
+                  <?php
+                  $urlParams = 'server=' . urlencode($pkg['server']);
+                  if (!empty($pkg['channel'])) {
+                    $urlParams .= '&channel=' . urlencode($pkg['channel']);
+                  }
+                  if (!empty($pkg['stability'])) {
+                    $urlParams .= '&stability=' . urlencode($pkg['stability']);
+                  }
+                  $linkUrl = 'joomla_downloader.php?' . $urlParams;
+                  ?>
+                  <div class="d-flex gap-2">
+                    <a href="<?php echo $linkUrl; ?>" class="btn btn-primary flex-grow-1 stretched-link"><i class="fa-solid fa-caret-right"></i> Install</a>
+                    <?php if (!empty($pkg['infourl'])): ?>
+                    <a href="<?php echo htmlspecialchars($pkg['infourl']['url']); ?>" target="_blank" class="btn btn-outline-info" style="z-index: 10;"><i class="fa-solid fa-circle-info"></i> <?php echo htmlspecialchars($pkg['infourl']['title']); ?></a>
+                    <?php endif; ?>
+                  </div>
                 </div>
               </div>
             </div>
@@ -112,9 +178,9 @@ if( !$pkg && !$clear ) {
       </div>
     </main>
 <?php
-} elseif ( $pkg && !$clear ) {
-  // Use the already validated variable
-  $pkgData = lastPkg($pkg);
+} elseif ( $server && !$clear ) {
+  // Call lastPkg with the provided server, channel, and stability parameters
+  $pkgData = lastPkg($server, $channel, $stability);
   
   // Additional URL validation
   if (!$pkgData || !isset($pkgData['url']) || !filter_var($pkgData['url'], FILTER_VALIDATE_URL)) {
@@ -215,14 +281,7 @@ if( !$pkg && !$clear ) {
           All done!
         </div>
         <div class="d-grid gap-2 col-6 mx-auto pt-5">
-          <a class="btn btn-success btn-lg" href="<?php 
-            // Build URL in a compatible way for all server environments
-            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-            $scriptDir = dirname($_SERVER['SCRIPT_NAME']);
-            $baseUrl = $protocol . '://' . $host . $scriptDir;
-            echo rtrim($baseUrl, '/') . '/';
-          ?>" role="button">Install Joomla!</a>
+          <a class="btn btn-success btn-lg" href="<?php echo str_replace(basename($_SERVER["SCRIPT_NAME"]), "", $_SERVER["SCRIPT_URI"]) ?>" role="button">Install Joomla!</a>
         </div>
       </div>
     </main>
@@ -349,7 +408,7 @@ if( !$pkg && !$clear ) {
   </body>
 </html>
 <?php
-  function lastPkg(string $server) : array {
+  function lastPkg(string $server, ?string $channel = null, ?string $stability = null) : array {
     //Joomla! Core update servers
     $updateUrls = array(
       'stable'        => 'https://update.joomla.org/core/sts/extension_sts.xml',
@@ -359,7 +418,8 @@ if( !$pkg && !$clear ) {
       'test'          => 'https://update.joomla.org/core/test/extension_test.xml',
       'nightly-major' => 'https://update.joomla.org/core/nightlies/next_major_extension.xml',
       'nightly-minor' => 'https://update.joomla.org/core/nightlies/next_minor_extension.xml',
-      'nightly-patch' => 'https://update.joomla.org/core/nightlies/next_patch_extension.xml'
+      'nightly-patch' => 'https://update.joomla.org/core/nightlies/next_patch_extension.xml',
+      'targets'       => 'https://update.joomla.org/cms/targets.json'
     );
     
     // Server validation
@@ -367,6 +427,204 @@ if( !$pkg && !$clear ) {
       return array();
     }
     
+    // Determine server type
+    $isNightly = in_array($server, ['nightly-major', 'nightly-minor', 'nightly-patch']);
+    $isTargets = ($server === 'targets');
+    
+    // Handle JSON targets endpoint
+    if ($isTargets) {
+      return parseTargetsJson($updateUrls[$server], $server, $channel, $stability);
+    }
+    
+    // Handle XML endpoints (stable, maintenance, j4, j5, test, nightlies)
+    return parseXmlEndpoint($updateUrls[$server], $server, $isNightly);
+  }
+  
+  /**
+   * Parse JSON targets endpoint with TUF format
+   */
+  function parseTargetsJson(string $url, string $server, ?string $channel, ?string $stability) : array {
+    $context = stream_context_create(array(
+      'http' => array(
+        'header' => 'Accept: application/json',
+        'timeout' => 30,
+        'user_agent' => 'Joomla! Downloader'
+      )
+    ));
+    
+    $jsonContent = file_get_contents($url, false, $context);
+    if ($jsonContent === false) {
+      return array();
+    }
+    
+    $data = json_decode($jsonContent, true);
+    if (json_last_error() !== JSON_ERROR_NONE || !isset($data['signed']['targets'])) {
+      return array();
+    }
+    
+    $targets = $data['signed']['targets'];
+    $pkgsUpd = array();
+    
+    // Normalize filters (case-insensitive)
+    $filterChannel = $channel ? strtolower($channel) : null;
+    $filterStability = $stability ? strtolower($stability) : null;
+    
+    foreach ($targets as $filename => $target) {
+      if (!isset($target['custom'])) {
+        continue;
+      }
+      
+      $custom = $target['custom'];
+      
+      // Extract metadata
+      $targetChannel = isset($custom['channel']) ? strtolower($custom['channel']) : '';
+      $targetStability = isset($custom['stability']) ? strtolower($custom['stability']) : '';
+      $version = isset($custom['version']) ? $custom['version'] : '';
+      
+      // Apply filters
+      if ($filterChannel && $targetChannel !== $filterChannel) {
+        continue;
+      }
+      
+      if ($filterStability && $targetStability !== $filterStability) {
+        continue;
+      }
+      
+      // Get download URLs
+      $downloads = isset($custom['downloads']) ? $custom['downloads'] : array();
+      if (empty($downloads)) {
+        continue;
+      }
+      
+      // Test URLs and find first working one (with multiple patterns)
+      $validUrl = null;
+      foreach ($downloads as $download) {
+        if (!isset($download['url'])) {
+          continue;
+        }
+        
+        $url = $download['url'];
+        
+        // URL validation
+        if (!filter_var($url, FILTER_VALIDATE_URL)) {
+          continue;
+        }
+        
+        // Test multiple URL patterns for maximum compatibility
+        $urlsToTest = [];
+        
+        // Pattern 1: Direct Full Package URL (works for most cases)
+        $fullPackageUrl = str_replace('Update_Package.zip', 'Full_Package.zip', $url);
+        $urlsToTest[] = $fullPackageUrl;
+        
+        // Pattern 2: update.joomla.org format (for downloads.joomla.org URLs)
+        if (strpos($url, 'downloads.joomla.org') !== false) {
+          // Extract version from URL like /5-1-2/ or /4-4-13/
+          if (preg_match('/\/(\d+-\d+-\d+)\//', $url, $matches)) {
+            $versionPath = str_replace('-', '.', $matches[1]);
+            $updateUrl = "https://update.joomla.org/releases/$versionPath/Joomla_$versionPath-Stable-Full_Package.zip";
+            $urlsToTest[] = $updateUrl;
+          }
+        }
+        
+        // Pattern 3: GitHub releases pattern (for github.com URLs)
+        if (strpos($url, 'github.com') !== false) {
+          // GitHub pattern: change -Update_Package to -Full_Package
+          $githubUrl = str_replace('-Update_Package.zip', '-Full_Package.zip', $url);
+          if ($githubUrl !== $url) {
+            $urlsToTest[] = $githubUrl;
+          }
+        }
+        
+        // Pattern 4: Alternative dash format
+        $altUrl = preg_replace('/Joomla_(\d+)\.(\d+)\.(\d+)/', 'Joomla_$1-$2-$3', $fullPackageUrl);
+        if ($altUrl !== $fullPackageUrl) {
+          $urlsToTest[] = $altUrl;
+        }
+        
+        // Test each URL pattern
+        foreach ($urlsToTest as $testUrl) {
+          $headers = @get_headers($testUrl, 1);
+          // Accept both 200 (OK) and 302 (Found/Redirect) as valid responses
+          $urlExists = $headers && (strpos($headers[0], '200') !== false || strpos($headers[0], '302') !== false);
+          
+          if ($urlExists) {
+            $validUrl = $testUrl;
+            break; // Stop at first working URL
+          }
+        }
+        
+        // If we found a valid URL, stop searching other downloads
+        if ($validUrl) {
+          break;
+        }
+      }
+      
+      if ($validUrl) {
+        // Stability priority for sorting: Stable=3, RC=2, Alpha=1, other=0
+        $stabilityPriority = 0;
+        switch ($targetStability) {
+          case 'stable':
+            $stabilityPriority = 3;
+            break;
+          case 'rc':
+          case 'release candidate':
+            $stabilityPriority = 2;
+            break;
+          case 'alpha':
+            $stabilityPriority = 1;
+            break;
+        }
+        
+        $pkgsUpd[] = array(
+          'name' => isset($custom['name']) ? $custom['name'] : $filename,
+          'version' => $version,
+          'server' => $server,
+          'branch' => ($targetStability === 'rc') ? 'test' : $targetChannel,
+          'description' => isset($custom['description']) ? $custom['description'] : '',
+          'php' => isset($custom['php_minimum']) ? $custom['php_minimum'] : '',
+          'url' => $validUrl,
+          'infourl' => isset($custom['infourl']) ? $custom['infourl'] : '',
+          'supported_databases' => isset($custom['supported_databases']) ? $custom['supported_databases'] : '',
+          'channel' => $targetChannel,
+          'stability' => $targetStability,
+          'stability_priority' => $stabilityPriority
+        );
+      }
+    }
+    
+    if (empty($pkgsUpd)) {
+      return array();
+    }
+    
+    // Sort by channel (higher first), then stability priority (higher first), then version (higher first)
+    usort($pkgsUpd, function($a, $b) {
+      // Compare channel (6.x > 5.x)
+      $channelCompare = version_compare($b['channel'], $a['channel']);
+      if ($channelCompare !== 0) {
+        return $channelCompare;
+      }
+      
+      // Compare stability priority (Stable > RC > Alpha)
+      $stabilityCompare = $b['stability_priority'] - $a['stability_priority'];
+      if ($stabilityCompare !== 0) {
+        return $stabilityCompare;
+      }
+      
+      // Compare version
+      return -1 * version_compare($a['version'], $b['version']);
+    });
+    
+    // Remove internal sorting fields
+    unset($pkgsUpd[0]['stability_priority']);
+    
+    return $pkgsUpd[0];
+  }
+  
+  /**
+   * Parse XML endpoint (stable, maintenance, j4, j5, test, nightlies)
+   */
+  function parseXmlEndpoint(string $url, string $server, bool $isNightly) : array {
     $context = stream_context_create(array(
       'http' => array(
         'header' => 'Accept: application/xml',
@@ -375,8 +633,8 @@ if( !$pkg && !$clear ) {
       )
     ));
     
-    $xml = file_get_contents($updateUrls[$server], false, $context);
-    if ($xml === false) {
+    $xmlContent = file_get_contents($url, false, $context);
+    if ($xmlContent === false) {
       return array();
     }
     
@@ -384,7 +642,7 @@ if( !$pkg && !$clear ) {
     $prevUseInternalErrors = libxml_use_internal_errors(true);
     
     // Load XML with security flags to prevent XXE
-    $xml = simplexml_load_string($xml, 'SimpleXMLElement', LIBXML_NONET);
+    $xml = simplexml_load_string($xmlContent, 'SimpleXMLElement', LIBXML_NONET);
     
     // Restore previous settings
     libxml_use_internal_errors($prevUseInternalErrors);
@@ -413,16 +671,26 @@ if( !$pkg && !$clear ) {
         continue;
       }
       
-      // Verify that the URL is from authorized Joomla domains
+      // Domain authorization based on server type
       $urlParts = parse_url($url);
-      $authorizedDomains = [
-        'update.joomla.org', 
-        'downloads.joomla.org', 
-        'developer.joomla.org',
-        'github.com'
-      ];
+      if (!isset($urlParts['host'])) {
+        continue;
+      }
       
-      if (!isset($urlParts['host']) || !in_array($urlParts['host'], $authorizedDomains)) {
+      if ($isNightly) {
+        // Nightly repositories: only developer.joomla.org
+        $authorizedDomains = ['developer.joomla.org'];
+      } else {
+        // Standard repositories: multiple authorized domains
+        $authorizedDomains = [
+          'update.joomla.org', 
+          'downloads.joomla.org', 
+          'developer.joomla.org',
+          'github.com'
+        ];
+      }
+      
+      if (!in_array($urlParts['host'], $authorizedDomains)) {
         continue;
       }
       
@@ -466,20 +734,39 @@ if( !$pkg && !$clear ) {
         
         if ($urlExists) {
           $validUrl = $testUrl;
-          break;
+          break; // Stop at first working URL
         }
       }
       
       if ($validUrl) {
-        // Only create package entry if we have a valid URL
-        $pkgsUpd[$version]['name'] = (string)$update->name;
-        $pkgsUpd[$version]['version'] = $version;
-        $pkgsUpd[$version]['server'] = $server;
-        $pkgsUpd[$version]['description'] = (string)$update->description;
-        $pkgsUpd[$version]['php'] = (string)$update->php_minimum;
-        $pkgsUpd[$version]['url'] = $validUrl;
+        // Extract infourl with title attribute
+        $infourl = '';
+        if (isset($update->infourl)) {
+          $infourlElement = $update->infourl;
+          $infourlUrl = (string)$infourlElement;
+          $infourlTitle = isset($infourlElement['title']) ? (string)$infourlElement['title'] : '';
+          
+          if (!empty($infourlUrl)) {
+            $infourl = array(
+              'url' => $infourlUrl,
+              'title' => $infourlTitle
+            );
+          }
+        }
+        
+        // Create package entry with standardized structure
+        $pkgsUpd[$version] = array(
+          'name' => (string)$update->name,
+          'version' => $version,
+          'server' => $server,
+          'branch' => $server,
+          'description' => (string)$update->description,
+          'php' => (string)$update->php_minimum,
+          'url' => $validUrl,
+          'infourl' => $infourl,
+          'supported_databases' => ''
+        );
       }
-      // If no valid URL found, skip this package (continue to next iteration)
     }
     
     if (empty($pkgsUpd)) {
