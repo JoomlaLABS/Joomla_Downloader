@@ -2,10 +2,11 @@
 
 ![image](https://user-images.githubusercontent.com/906604/235441118-ec1a1812-3f15-4b24-bc41-58c28b20b703.png)
 
-[![GitHub all releases](https://img.shields.io/github/downloads/JoomlaLABS/Joomla_Downloader/total?style=for-the-badge&color=blue)](https://github.com/JoomlaLABS/Joomla_Downloader/releases)
-[![GitHub release (latest by SemVer)](https://img.shields.io/github/v/release/JoomlaLABS/Joomla_Downloader?sort=semver&style=for-the-badge&color=blue)](https://github.com/JoomlaLABS/Joomla_Downloader/releases/latest)
+![GitHub all releases](https://img.shields.io/github/downloads/JoomlaLABS/Joomla_Downloader/total?style=for-the-badge&color=blue)
+![GitHub release (latest by SemVer)](https://img.shields.io/github/downloads/JoomlaLABS/Joomla_Downloader/latest/total?style=for-the-badge&color=blue)
+![GitHub release (latest by SemVer)](https://img.shields.io/github/v/release/JoomlaLABS/Joomla_Downloader?sort=semver&style=for-the-badge&color=blue)
 
-[![License](https://img.shields.io/badge/License-GPL%20v2-blue)](LICENSE)
+[![License](https://img.shields.io/badge/license-GPL%202.0%2B-blue.svg)](LICENSE)
 [![PHP Version](https://img.shields.io/badge/PHP-7.4%2B-777BB4?logo=php&logoColor=white)](https://www.php.net/)
 
 ## Description
