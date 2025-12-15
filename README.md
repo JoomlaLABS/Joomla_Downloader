@@ -1,8 +1,18 @@
 # Joomla! Downloader
 
-A smart PHP script to automatically download and install the latest version of Joomla! directly on your server with just one click.
-
 ![image](https://user-images.githubusercontent.com/906604/235441118-ec1a1812-3f15-4b24-bc41-58c28b20b703.png)
+
+[![GitHub all releases](https://img.shields.io/github/downloads/JoomlaLABS/Joomla_Downloader/total?style=for-the-badge&color=blue)](https://github.com/JoomlaLABS/Joomla_Downloader/releases)
+[![GitHub release (latest by SemVer)](https://img.shields.io/github/v/release/JoomlaLABS/Joomla_Downloader?sort=semver&style=for-the-badge&color=blue)](https://github.com/JoomlaLABS/Joomla_Downloader/releases/latest)
+
+[![License](https://img.shields.io/badge/License-GPL%20v2-blue)](LICENSE)
+[![PHP Version](https://img.shields.io/badge/PHP-7.4%2B-777BB4?logo=php&logoColor=white)](https://www.php.net/)
+
+## Description
+
+**Joomla! Downloader** is a smart, single-file PHP script that revolutionizes the Joomla! installation process. Built to save time and simplify deployment, it automatically downloads and installs the latest version of Joomla! directly on your server with just one click - no FTP uploads, no manual downloads, no waiting.
+
+Perfect for site administrators, developers, and testers who want to save time and have instant access to all Joomla! versions including stable releases, release candidates, and nightly builds directly from official Joomla! update servers.
 
 ## 🚀 Why Use Joomla! Downloader?
 
@@ -259,7 +269,7 @@ This project is licensed under the **GNU General Public License v2.0** - see the
 GNU GENERAL PUBLIC LICENSE
 Version 2, June 1991
 
-Copyright (C) 2023-2025 Luca Racchetti (Razzo1987)
+Copyright (C) 2023-2025 Joomla!LABS
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -272,9 +282,19 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU General Public License for more details.
 ```
 
-## 👨‍💻 Author
+## 👥 Project Information
 
-### **Luca Racchetti**
+### 🏢 Project Owner
+
+**Joomla!LABS** - [https://joomlalabs.com](https://joomlalabs.com)
+
+[![Email](https://img.shields.io/badge/Email-info%40joomlalabs.com-red?style=for-the-badge&logo=gmail&logoColor=white)](mailto:info@joomlalabs.com)
+
+*Joomla!LABS is the company that owns and maintains this project.*
+
+### 👨‍💻 Contributors
+
+**Luca Racchetti** - Lead Developer
 
 [![Email](https://img.shields.io/badge/Email-Razzo1987%40gmail.com-red?style=for-the-badge&logo=gmail&logoColor=white)](mailto:Razzo1987@gmail.com)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Luca%20Racchetti-blue?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/razzo/)
@@ -283,12 +303,6 @@ GNU General Public License for more details.
 *Full-Stack Developer passionate about creating modern, efficient web applications and tools for the Joomla! community*
 
 ## 🆘 Support
-
-### 🍺 Support the Project
-
-If this project helped you save time, consider buying me a beer! 🍻
-
-[![Buy me a beer](https://img.shields.io/badge/🍺%20Buy%20me%20a-beer-FFDD00?style=for-the-badge&labelColor=FFDD00&color=FFDD00)](https://buymeacoffee.com/razzo)
 
 ### 💬 Get Help
 
@@ -299,8 +313,17 @@ Need help? We're here for you!
 - ❓ **Questions?** [Start a discussion](https://github.com/JoomlaLABS/Joomla_Downloader/discussions)
 - 📧 **Direct contact:** [Razzo1987@gmail.com](mailto:Razzo1987@gmail.com)
 
+## 💝 Donate
+
+If you find this project useful, consider supporting its development:
+
+[![Sponsor on GitHub](https://img.shields.io/badge/Sponsor-GitHub-ea4aaa?style=for-the-badge&logo=github)](https://github.com/sponsors/JoomlaLABS)
+[![Buy me a beer](https://img.shields.io/badge/🍺%20Buy%20me%20a-beer-FFDD00?style=for-the-badge&labelColor=FFDD00&color=FFDD00)](https://buymeacoffee.com/razzo)
+
+Your support helps maintain and improve this project!
+
 ---
 
-**⭐ If this project helped you, please consider giving it a star! ⭐**
+**Made with ❤️ for the Joomla! Community**
 
-*Perfect for site administrators, developers, and testers who want to save time and have instant access to all Joomla! versions.*
+**⭐ If this project helped you, please consider giving it a star! ⭐**
