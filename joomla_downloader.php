@@ -1,7 +1,113 @@
-<!doctype html>
 <?php
-  $thisRelease = 'v2.0.0';
+  session_start();
+  $thisRelease = 'v2.5.0';
+  
+  // AJAX endpoint for progress tracking
+  if (isset($_GET['action']) && $_GET['action'] === 'progress') {
+    header('Content-Type: application/json');
+    echo json_encode(isset($_SESSION['install_progress']) ? $_SESSION['install_progress'] : array('step' => 0, 'message' => 'Waiting...', 'percent' => 0));
+    exit;
+  }
+  
+  // AJAX endpoint for installation execution
+  if (isset($_GET['action']) && $_GET['action'] === 'install') {
+    $server = isset($_GET['server']) ? trim($_GET['server']) : null;
+    $channel = isset($_GET['channel']) ? trim($_GET['channel']) : null;
+    $stability = isset($_GET['stability']) ? trim($_GET['stability']) : null;
+    
+    // Validation
+    $allowedServers = array('targets', 'nightly-major', 'nightly-minor', 'nightly-patch');
+    if (!$server || !in_array($server, $allowedServers)) {
+      header('Content-Type: application/json');
+      echo json_encode(array('success' => false, 'error' => 'Invalid server parameter'));
+      exit;
+    }
+    
+    // Execute installation
+    executeInstallation($server, $channel, $stability);
+    exit;
+  }
+  
+  // AJAX endpoint for loading packages
+  if (isset($_GET['action']) && $_GET['action'] === 'get_packages') {
+    header('Content-Type: application/json');
+    
+    // Get all packages
+    $pkgs = array();
+    $pkgs[] = lastPkg('targets');
+    $pkgs[] = lastPkg('targets', '5.x');
+    $pkgs[] = lastPkg('targets', null, 'RC');
+    $pkgs[] = lastPkg('nightly-major');
+    $pkgs[] = lastPkg('nightly-minor');
+    $pkgs[] = lastPkg('nightly-patch');
+    
+    // Save reference to last targets call for icon comparison
+    $lastTargetsPkg = lastPkg('targets');
+    
+    // Prepare response array
+    $response = array();
+    
+    foreach ($pkgs as $pkg) {
+      // Skip if completely empty or missing essential data
+      if (empty($pkg) || !isset($pkg['name']) || !isset($pkg['version']) || empty($pkg['url'])) {
+        continue;
+      }
+      
+      // Determine icon and color based on server, stability, and branch
+      $server = isset($pkg['server']) ? $pkg['server'] : '';
+      $stability = isset($pkg['stability']) ? $pkg['stability'] : '';
+      $branch = isset($pkg['branch']) ? $pkg['branch'] : '';
+      
+      // Assign icon type and color
+      $iconType = 'default';
+      $color = 'text-secondary';
+      
+      if (in_array($server, ['nightly-major', 'nightly-minor', 'nightly-patch'])) {
+        $color = 'text-warning';
+        $iconType = $server; // nightly-major, nightly-minor, nightly-patch
+      } elseif ($server === 'test' || strtolower($stability) === 'rc' || strtolower($branch) === 'test') {
+        $color = 'text-info';
+        $iconType = 'test';
+      } elseif (in_array($server, ['stable', 'maintenance', 'j4', 'j5'])) {
+        $color = 'text-success';
+        $iconType = 'archive';
+      } elseif ($server === 'targets') {
+        $color = 'text-success';
+        $iconType = ($pkg === $lastTargetsPkg) ? 'box' : 'archive';
+      }
+      
+      // Build URL parameters
+      $urlParams = 'server=' . urlencode($pkg['server']);
+      if (!empty($pkg['channel'])) {
+        $urlParams .= '&channel=' . urlencode($pkg['channel']);
+      }
+      if (!empty($pkg['stability'])) {
+        $urlParams .= '&stability=' . urlencode($pkg['stability']);
+      }
+      
+      // Add to response
+      $response[] = array(
+        'id' => $pkg['server'] . '_' . $pkg['version'],
+        'name' => $pkg['name'],
+        'description' => $pkg['description'],
+        'version' => $pkg['version'],
+        'branch' => $pkg['branch'],
+        'stability' => isset($pkg['stability']) ? $pkg['stability'] : '',
+        'php' => $pkg['php'],
+        'supported_databases' => isset($pkg['supported_databases']) ? $pkg['supported_databases'] : array(),
+        'url' => $pkg['url'],
+        'infourl' => isset($pkg['infourl']) ? $pkg['infourl'] : null,
+        'color' => $color,
+        'iconType' => $iconType,
+        'linkUrl' => 'joomla_downloader.php?' . $urlParams
+      );
+    }
+    
+    echo json_encode($response);
+    exit;
+  }
 ?>
+<!doctype html>
 <html lang="en" class="h-100" data-bs-theme="dark">
   <head>
     <meta charset="utf-8">
@@ -40,143 +146,122 @@ if ($server !== null && !in_array($server, $allowedServers)) {
 if( !$server && !$clear ) {
 ?>
     <main class="flex-shrink-0">
-      <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 py-4 m-0">
-<?php
-  //Joomla! Core update servers types
-  $pkgs = array();
-  $pkgs[] = lastPkg('targets');
-  $pkgs[] = lastPkg('targets', '5.x');
-  $pkgs[] = lastPkg('targets', null, 'RC');
-  $pkgs[] = lastPkg('nightly-major');
-  $pkgs[] = lastPkg('nightly-minor');
-  $pkgs[] = lastPkg('nightly-patch');
-  
-  // Save reference to last targets call for icon comparison
-  $lastTargetsPkg = lastPkg('targets');
-  
-  foreach ($pkgs as $pkg) {
-    // Skip only if completely empty or missing essential data
-    if (empty($pkg) || !isset($pkg['name']) || !isset($pkg['version']) || empty($pkg['url'])) {
-      continue;
-    }
+      <!-- Loading Spinner -->
+      <div id="loadingSpinner" class="text-center py-5">
+        <div class="spinner-border text-primary" style="width: 4rem; height: 4rem;" role="status">
+          <span class="visually-hidden">Loading packages...</span>
+        </div>
+        <p class="mt-3 text-muted">Loading available Joomla! packages...</p>
+      </div>
+      
+      <!-- Packages Container (initially hidden) -->
+      <div id="packagesContainer" class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 py-4 m-0" style="display: none;">
+        <!-- Cards will be inserted here by JavaScript -->
+      </div>
+    </main>
     
-    $color;
-    $icon;
-    
-    // Determine icon and color based on server, stability, and branch
-    $server = isset($pkg['server']) ? $pkg['server'] : '';
-    $stability = isset($pkg['stability']) ? $pkg['stability'] : '';
-    $branch = isset($pkg['branch']) ? $pkg['branch'] : '';
-    
-    // Priority 1: Check server for nightly versions
-    if (in_array($server, ['nightly-major', 'nightly-minor', 'nightly-patch'])) {
-      $color = 'text-warning';
-      switch ($server) {
-        case 'nightly-major':
-          $icon = '<span class="fa-layers fa-fw"><i class="fa-solid fa-moon fa-4x"></i><span class="bg-danger fa-4x fa-layers-counter fa-layers-bottom-left" style="--fa-bottom: -4rem;">major</span></span>';
-          break;
-        case 'nightly-minor':
-          $icon = '<span class="fa-layers fa-fw"><i class="fa-solid fa-moon fa-4x"></i><span class="bg-danger fa-4x fa-layers-counter fa-layers-bottom-left" style="--fa-bottom: -4rem;">minor</span></span>';
-          break;
-        case 'nightly-patch':
-          $icon = '<span class="fa-layers fa-fw"><i class="fa-solid fa-moon fa-4x"></i><span class="bg-danger fa-4x fa-layers-counter fa-layers-bottom-left" style="--fa-bottom: -4rem;">patch</span></span>';
-          break;
-      }
-    }
-    // Priority 2: Check server for test or check stability for RC
-    elseif ($server === 'test' || strtolower($stability) === 'rc' || strtolower($branch) === 'test') {
-      $color = 'text-info';
-      $icon = '<i class="fa-solid fa-vial fa-fw fa-4x"></i>';
-    }
-    // Priority 3: Check server for stable repositories (use fa-box-archive)
-    elseif (in_array($server, ['stable', 'maintenance', 'j4', 'j5'])) {
-      $color = 'text-success';
-      $icon = '<i class="fa-solid fa-box-archive fa-fw fa-4x"></i>';
-    }
-    // Priority 4: Check if server is 'targets'
-    elseif ($server === 'targets') {
-      $color = 'text-success';
-      // If this package is the same as the last targets call (lastPkg('targets')), use fa-box
-      if ($pkg === $lastTargetsPkg) {
-        $icon = '<i class="fa-solid fa-box fa-fw fa-4x"></i>';
-      } else {
-        // Otherwise use fa-box-archive
-        $icon = '<i class="fa-solid fa-box-archive fa-fw fa-4x"></i>';
-      }
-    }
-    // Default fallback
-    else {
-      $color = 'text-secondary';
-      $icon = '<i class="fa-solid fa-question fa-4x"></i>';
-    }
-?>
-        <div class="col">
-          <div id="<?php echo $pkg['server']; ?>_<?php echo $pkg['version']; ?>" class="card mb-4 h-100">
-            <div class="row g-0">
-              <div class="col-md-3 <?php echo $color; ?> text-center align-self-center py-4">
-                <?php echo $icon."\n"; ?>
-              </div>
-              <div class="col-md-9">
-                <div class="card-body">
-                  <h5 class="card-title"><?php echo $pkg['name']; ?></h5>
-                  <p class="card-text"><?php echo $pkg['description']; ?></p>
-                  <?php
-                  // Format supported databases
-                  $dbText = '';
-                  if (!empty($pkg['supported_databases'])) {
-                    $dbParts = [];
-                    if (isset($pkg['supported_databases']['mariadb'])) {
-                      $dbParts[] = 'mariadb: ' . $pkg['supported_databases']['mariadb'];
-                    }
-                    if (isset($pkg['supported_databases']['mysql'])) {
-                      $dbParts[] = 'mysql: ' . $pkg['supported_databases']['mysql'];
-                    }
-                    if (isset($pkg['supported_databases']['postgresql'])) {
-                      $dbParts[] = 'postgresql: ' . $pkg['supported_databases']['postgresql'];
-                    }
-                    $dbText = implode(' | ', $dbParts);
-                  }
-                  ?>
-                  <ul class="card-text list-inline text-muted small">
-                    <li class="list-inline-item"><i class="fa-brands fa-joomla"></i> <?php echo $pkg['version']; ?></li>
-                    <li class="list-inline-item"><i class="fa-solid fa-code-branch"></i> <?php echo $pkg['branch']; ?></li>
-                    <?php if (!empty($pkg['stability'])): ?>
-                    <li class="list-inline-item"><i class="fa-solid fa-layer-group"></i> <?php echo $pkg['stability']; ?></li>
-                    <?php endif; ?>
-                  </ul>
-                  <ul class="card-text list-inline text-muted small">
-                    <li class="list-inline-item"><i class="fa-brands fa-php"></i> <?php echo $pkg['php']; ?></li>
-                    <?php if ($dbText): ?>
-                    <li class="list-inline-item"><i class="fa-solid fa-database"></i> <?php echo $dbText; ?></li>
-                    <?php endif; ?>
-                  </ul>
-                  <p class="card-text"><small class="text-muted"><i class="fa-solid fa-download"></i> <?php echo $pkg['url'] ?></small></p>
-                  <?php
-                  $urlParams = 'server=' . urlencode($pkg['server']);
-                  if (!empty($pkg['channel'])) {
-                    $urlParams .= '&channel=' . urlencode($pkg['channel']);
-                  }
-                  if (!empty($pkg['stability'])) {
-                    $urlParams .= '&stability=' . urlencode($pkg['stability']);
-                  }
-                  $linkUrl = 'joomla_downloader.php?' . $urlParams;
-                  ?>
-                  <div class="d-flex gap-2">
-                    <a href="<?php echo $linkUrl; ?>" class="btn btn-primary flex-grow-1 stretched-link"><i class="fa-solid fa-caret-right"></i> Install</a>
-                    <?php if (!empty($pkg['infourl'])): ?>
-                    <a href="<?php echo htmlspecialchars($pkg['infourl']['url']); ?>" target="_blank" class="btn btn-outline-info" style="z-index: 10;"><i class="fa-solid fa-circle-info"></i> <?php echo htmlspecialchars($pkg['infourl']['title']); ?></a>
-                    <?php endif; ?>
+    <script>
+    // Load packages via AJAX
+    document.addEventListener('DOMContentLoaded', function() {
+      fetch('joomla_downloader.php?action=get_packages')
+        .then(response => response.json())
+        .then(packages => {
+          const container = document.getElementById('packagesContainer');
+          const spinner = document.getElementById('loadingSpinner');
+          
+          packages.forEach(pkg => {
+            // Generate icon HTML based on iconType
+            let iconHTML = '';
+            switch(pkg.iconType) {
+              case 'nightly-major':
+                iconHTML = '<span class="fa-layers fa-fw"><i class="fa-solid fa-moon fa-4x"></i><span class="bg-danger fa-4x fa-layers-counter fa-layers-bottom-left" style="--fa-bottom: -4rem;">major</span></span>';
+                break;
+              case 'nightly-minor':
+                iconHTML = '<span class="fa-layers fa-fw"><i class="fa-solid fa-moon fa-4x"></i><span class="bg-danger fa-4x fa-layers-counter fa-layers-bottom-left" style="--fa-bottom: -4rem;">minor</span></span>';
+                break;
+              case 'nightly-patch':
+                iconHTML = '<span class="fa-layers fa-fw"><i class="fa-solid fa-moon fa-4x"></i><span class="bg-danger fa-4x fa-layers-counter fa-layers-bottom-left" style="--fa-bottom: -4rem;">patch</span></span>';
+                break;
+              case 'test':
+                iconHTML = '<i class="fa-solid fa-vial fa-fw fa-4x"></i>';
+                break;
+              case 'archive':
+                iconHTML = '<i class="fa-solid fa-box-archive fa-fw fa-4x"></i>';
+                break;
+              case 'box':
+                iconHTML = '<i class="fa-solid fa-box fa-fw fa-4x"></i>';
+                break;
+              default:
+                iconHTML = '<i class="fa-solid fa-question fa-4x"></i>';
+            }
+            
+            // Format supported databases
+            let dbText = '';
+            if (pkg.supported_databases) {
+              const dbParts = [];
+              if (pkg.supported_databases.mariadb) dbParts.push('mariadb: ' + pkg.supported_databases.mariadb);
+              if (pkg.supported_databases.mysql) dbParts.push('mysql: ' + pkg.supported_databases.mysql);
+              if (pkg.supported_databases.postgresql) dbParts.push('postgresql: ' + pkg.supported_databases.postgresql);
+              dbText = dbParts.join(' | ');
+            }
+            
+            // Build stability list item
+            const stabilityHTML = pkg.stability ? `<li class="list-inline-item"><i class="fa-solid fa-layer-group"></i> ${pkg.stability}</li>` : '';
+            
+            // Build database list item
+            const dbHTML = dbText ? `<li class="list-inline-item"><i class="fa-solid fa-database"></i> ${dbText}</li>` : '';
+            
+            // Build info button
+            const infoButtonHTML = pkg.infourl ? 
+              `<a href="${pkg.infourl.url}" target="_blank" class="btn btn-outline-info" style="z-index: 10;"><i class="fa-solid fa-circle-info"></i> ${pkg.infourl.title}</a>` : '';
+            
+            // Create card HTML
+            const cardHTML = `
+              <div class="col">
+                <div id="${pkg.id}" class="card mb-4 h-100">
+                  <div class="row g-0">
+                    <div class="col-md-3 ${pkg.color} text-center align-self-center py-4">
+                      ${iconHTML}
+                    </div>
+                    <div class="col-md-9">
+                      <div class="card-body">
+                        <h5 class="card-title">${pkg.name}</h5>
+                        <p class="card-text">${pkg.description}</p>
+                        <ul class="card-text list-inline text-muted small">
+                          <li class="list-inline-item"><i class="fa-brands fa-joomla"></i> ${pkg.version}</li>
+                          <li class="list-inline-item"><i class="fa-solid fa-code-branch"></i> ${pkg.branch}</li>
+                          ${stabilityHTML}
+                        </ul>
+                        <ul class="card-text list-inline text-muted small">
+                          <li class="list-inline-item"><i class="fa-brands fa-php"></i> ${pkg.php}</li>
+                          ${dbHTML}
+                        </ul>
+                        <p class="card-text"><small class="text-muted"><i class="fa-solid fa-download"></i> ${pkg.url}</small></p>
+                        <div class="d-flex gap-2">
+                          <a href="${pkg.linkUrl}" class="btn btn-primary flex-grow-1 stretched-link"><i class="fa-solid fa-caret-right"></i> Install</a>
+                          ${infoButtonHTML}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-<?php
-  }
-?>
-      </div>
-    </main>
+            `;
+            
+            container.insertAdjacentHTML('beforeend', cardHTML);
+          });
+          
+          // Hide spinner and show packages
+          spinner.style.display = 'none';
+          container.style.display = 'flex';
+        })
+        .catch(error => {
+          console.error('Error loading packages:', error);
+          const spinner = document.getElementById('loadingSpinner');
+          spinner.innerHTML = '<div class="alert alert-danger"><i class="fa-solid fa-triangle-exclamation"></i> Error loading packages. Please refresh the page.</div>';
+        });
+    });
+    </script>
 <?php
 } elseif ( $server && !$clear ) {
   // Call lastPkg with the provided server, channel, and stability parameters
@@ -195,79 +280,58 @@ if( !$server && !$clear ) {
   if (!in_array($urlParts['host'], $authorizedDomains)) {
     die('Error: Unauthorized domain.');
   }
+  
+  // Store installation parameters in session for AJAX call
+  $_SESSION['install_params'] = array(
+    'server' => $server,
+    'channel' => $channel,
+    'stability' => $stability,
+    'url' => $pkgUrl
+  );
 ?>
     <main class="flex-shrink-0">
       <div class="container">
-        <p class="lead">
-          <?php echo "Downloading <code>" . htmlspecialchars($pkgUrl, ENT_QUOTES, 'UTF-8') . "</code> . . ."; ?>
-        </p>
-<?php
-  $pkgFileName = basename($pkgUrl);
-  
-  // File name validation
-  if (!preg_match('/^[a-zA-Z0-9._-]+\.zip$/', $pkgFileName)) {
-    die('Error: Invalid file name.');
-  }
-  
-  $pkgPath = getcwd() . DIRECTORY_SEPARATOR . $pkgFileName;
-  
-  // Download with improved error handling
-  $fileContent = file_get_contents($pkgUrl);
-  if ($fileContent === false) {
-    die('Error: Unable to download file.');
-  }
-  
-  $bytesWritten = file_put_contents($pkgPath, $fileContent);
-  if ($bytesWritten === false) {
-    die('Error: Unable to save file.');
-  }
-?>
-        <p class="lead">
-          <?php echo "Unzipping <code>" . htmlspecialchars($pkgFileName, ENT_QUOTES, 'UTF-8') . "</code> . . ."; ?>
-        </p>
-<?php
-  $zip = new ZipArchive;
-  $res = $zip->open($pkgPath);
-  if ($res === TRUE) {
-    // Validate files in archive before extraction
-    $extractPath = getcwd() . DIRECTORY_SEPARATOR;
-    
-    for ($i = 0; $i < $zip->numFiles; $i++) {
-      $filename = $zip->getNameIndex($i);
-      
-      // Directory traversal prevention
-      if (strpos($filename, '..') !== false || strpos($filename, '/') === 0) {
-        $zip->close();
-        unlink($pkgPath);
-        die('Error: Archive contains unsafe paths.');
-      }
-    }
-    
-    $zip->extractTo($extractPath);
-    $zip->close();
-  } else {
-    unlink($pkgPath);
-    die('Error: Unable to open ZIP archive.');
-  }
-?>
-        <p class="lead">
-          <?php echo "Deleting <code>" . htmlspecialchars($pkgFileName, ENT_QUOTES, 'UTF-8') . "</code> . . ."; ?>
-        </p>
-<?php
-  if (file_exists($pkgPath) && !unlink($pkgPath)) {
-    echo '<div class="alert alert-warning" role="alert">Warning: Unable to delete ZIP file.</div>';
-  }
-?>
-        <div class="alert alert-success" role="alert">
-          All done!
+        <!-- Progress Bar UI -->
+        <div id="progressContainer" class="mb-4">
+          <h5 id="progressMessage">Initializing...</h5>
+          <div class="progress" style="height: 30px;">
+            <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+          </div>
+          <div class="mt-2">
+            <small class="text-muted">
+              <span id="stepInfo">Step 1 of 5: Preparing...</span>
+            </small>
+          </div>
         </div>
-        <div class="d-grid gap-2 col-6 mx-auto pt-5">
-          <a class="btn btn-primary btn-lg" href="joomla_downloader.php?clear" role="button">Delete this script</a>
+        
+        <div id="statusMessages">
+          <p class="lead">Preparing to download <code><?php echo htmlspecialchars($pkgUrl, ENT_QUOTES, 'UTF-8'); ?></code></p>
+        </div>
+        
+        <!-- Installation Steps Log -->
+        <div id="stepsLog" class="card mb-4">
+          <div class="card-header">
+            <h6 class="mb-0">Installation Steps</h6>
+          </div>
+          <div class="card-body">
+            <ul id="stepsList" class="list-unstyled mb-0">
+              <!-- Steps will be added here dynamically -->
+            </ul>
+          </div>
+        </div>
+        
+        <div id="completionMessage" class="d-none">
+          <div class="alert alert-success" role="alert">
+            All done!
+          </div>
+          <div class="d-grid gap-2 col-6 mx-auto pt-5">
+            <a class="btn btn-primary btn-lg" href="joomla_downloader.php?clear" role="button">Delete this script</a>
+          </div>
         </div>
       </div>
     </main>
 <?php
-} elseif ( !$pkg && $clear ) {
+} elseif ( $clear ) {
 ?>
     <main class="flex-shrink-0">
       <div class="container">
@@ -281,7 +345,7 @@ if( !$server && !$clear ) {
           All done!
         </div>
         <div class="d-grid gap-2 col-6 mx-auto pt-5">
-          <a class="btn btn-success btn-lg" href="<?php echo str_replace(basename($_SERVER["SCRIPT_NAME"]), "", $_SERVER["SCRIPT_URI"]) ?>" role="button">Install Joomla!</a>
+          <a class="btn btn-success btn-lg" href="<?php echo rtrim(dirname($_SERVER['PHP_SELF']), '/\\') . '/' ?>" role="button">Install Joomla!</a>
         </div>
       </div>
     </main>
@@ -299,11 +363,13 @@ if( !$server && !$clear ) {
     curl_setopt_array($ch, [
       CURLOPT_URL => 'https://api.github.com/repos/JoomlaLABS/Joomla_Downloader/releases/latest',
       CURLOPT_RETURNTRANSFER => true,
-      CURLOPT_USERAGENT => 'Joomla!LABS User Agent',
+      CURLOPT_USERAGENT => 'Joomla! Downloader',
       CURLOPT_FOLLOWLOCATION => true,
       CURLOPT_FAILONERROR => true,
       CURLOPT_TIMEOUT => 10,
-      CURLOPT_CONNECTTIMEOUT => 5
+      CURLOPT_CONNECTTIMEOUT => 5,
+      CURLOPT_SSL_VERIFYPEER => false,
+      CURLOPT_SSL_VERIFYHOST => false
     ]);
     
     $response = curl_exec($ch);
@@ -353,41 +419,45 @@ if( !$server && !$clear ) {
   
   // Function to render version status
   function renderVersionStatus($releaseInfo) {
+    $repoUrl = 'https://github.com/JoomlaLABS/Joomla_Downloader';
+    $current = htmlspecialchars($releaseInfo['current'], ENT_QUOTES, 'UTF-8');
+    $downloadUrl = $repoUrl . '/releases/tag/' . urlencode($releaseInfo['current']);
+    
     if (!$releaseInfo['success']) {
       return sprintf(
-        '<p class="text-muted mb-0">%s</p><p class="text-warning mb-0">%s</p>',
-        htmlspecialchars($releaseInfo['current'], ENT_QUOTES, 'UTF-8'),
+        '<p class="text-muted mb-0"><a href="%s" target="_blank" class="text-muted text-decoration-none">%s <i class="fa-solid fa-download"></i></a></p><p class="text-warning mb-0">%s</p>',
+        $downloadUrl,
+        $current,
         htmlspecialchars($releaseInfo['error'], ENT_QUOTES, 'UTF-8')
       );
     }
     
-    $current = htmlspecialchars($releaseInfo['current'], ENT_QUOTES, 'UTF-8');
     $latest = htmlspecialchars($releaseInfo['latest'], ENT_QUOTES, 'UTF-8');
-    $url = htmlspecialchars($releaseInfo['url'], ENT_QUOTES, 'UTF-8');
+    $latestUrl = htmlspecialchars($releaseInfo['url'], ENT_QUOTES, 'UTF-8');
     
     switch ($releaseInfo['comparison']) {
       case 0: // Same version
         return sprintf(
-          '<p class="text-muted mb-0">%s</p><p class="text-muted mb-0">the latest</p>',
-          $current
+          '<p class="text-muted mb-0"><a href="%s" target="_blank" class="text-muted text-decoration-none">%s <i class="fa-solid fa-download"></i></a></p><p class="text-muted mb-0"><a href="%s" target="_blank" class="text-muted text-decoration-none">the latest <i class="fa-solid fa-download"></i></a></p>',
+          $downloadUrl, $current, $latestUrl
         );
         
       case -1: // Current is older
         return sprintf(
-          '<p class="text-muted mb-0">%s</p><p><a class="text-danger mb-0" href="%s" target="_blank">%s available</a></p>',
-          $current, $url, $latest
+          '<p class="text-muted mb-0"><a href="%s" target="_blank" class="text-muted text-decoration-none">%s <i class="fa-solid fa-download"></i></a></p><p><a class="text-danger mb-0" href="%s" target="_blank">%s available <i class="fa-solid fa-download"></i></a></p>',
+          $downloadUrl, $current, $latestUrl, $latest
         );
         
-      case 1: // Current is newer (development)
+      case 1: // Current is newer (development) - no download link for unreleased version
         return sprintf(
-          '<p class="text-warning mb-0">%s</p><p class="text-muted mb-0">%s is the latest</p>',
-          $current, $latest
+          '<p class="text-warning mb-0">%s</p><p class="text-muted mb-0"><a href="%s" target="_blank" class="text-muted text-decoration-none">%s is the latest <i class="fa-solid fa-download"></i></a></p>',
+          $current, $latestUrl, $latest
         );
         
       default:
         return sprintf(
-          '<p class="text-muted mb-0">%s</p><p class="text-muted mb-0">Version check failed</p>',
-          $current
+          '<p class="text-muted mb-0"><a href="%s" target="_blank" class="text-muted text-decoration-none">%s <i class="fa-solid fa-download"></i></a></p><p class="text-muted mb-0">Version check failed</p>',
+          $downloadUrl, $current
         );
     }
   }
@@ -398,6 +468,7 @@ if( !$server && !$clear ) {
 ?>
           </div>
           <div class='col col-12 col-md-10 align-self-center'>
+            <p class="mb-2"><strong><a href="https://github.com/JoomlaLABS/Joomla_Downloader" target="_blank" class="text-decoration-none">Joomla! Downloader</a></strong> is a smart, single-file PHP script that revolutionizes the Joomla! installation process.</p>
             <p class="text-muted mb-0">Joomla!LABS and this file is not affiliated with or endorsed by The Joomla! Project™. Any products and services provided through this file are not supported or warrantied by The Joomla! Project or Open Source Matters, Inc. Use of the Joomla!® name, symbol, logo and related trademarks is permitted under a limited license granted by Open Source Matters, Inc.</p>
           </div>
         </div>
@@ -405,9 +476,337 @@ if( !$server && !$clear ) {
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ENjdO4Dr2bkBIFxQpeoTz1HIcje39Wm4jDKdf19U8gI4ddQ3GYNS7NTKfAdVQSZe" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    
+    <script>
+      // Progress tracking with AJAX polling
+      (function() {
+        const progressBar = document.getElementById('progressBar');
+        const progressMessage = document.getElementById('progressMessage');
+        const stepInfo = document.getElementById('stepInfo');
+        const progressContainer = document.getElementById('progressContainer');
+        const completionMessage = document.getElementById('completionMessage');
+        const statusMessages = document.getElementById('statusMessages');
+        const stepsList = document.getElementById('stepsList');
+        
+        if (!progressContainer) return; // Only run on installation page
+        
+        const stepNames = [
+          'Preparing download...',
+          'Downloading package...',
+          'Validating archive...',
+          'Extracting files...',
+          'Cleaning up...'
+        ];
+        
+        let lastCompletedStep = -1;
+        let hasError = false;
+        
+        // Function to add a step to the log
+        function addStepToLog(stepName, success) {
+          const li = document.createElement('li');
+          li.className = 'mb-2';
+          
+          const icon = document.createElement('i');
+          if (success) {
+            icon.className = 'fas fa-check-circle text-success me-2';
+          } else {
+            icon.className = 'fas fa-times-circle text-danger me-2';
+          }
+          
+          const text = document.createTextNode(stepName);
+          
+          li.appendChild(icon);
+          li.appendChild(text);
+          stepsList.appendChild(li);
+        }
+        
+        // Start installation via AJAX
+        function startInstallation() {
+          const urlParams = new URLSearchParams(window.location.search);
+          const server = urlParams.get('server');
+          const channel = urlParams.get('channel');
+          const stability = urlParams.get('stability');
+          
+          let installUrl = '?action=install&server=' + encodeURIComponent(server);
+          if (channel) installUrl += '&channel=' + encodeURIComponent(channel);
+          if (stability) installUrl += '&stability=' + encodeURIComponent(stability);
+          
+          // Fire and forget - we rely on polling for status
+          fetch(installUrl, {
+            method: 'GET',
+            cache: 'no-cache'
+          }).catch(error => {
+            // Ignore fetch errors - polling will handle status
+            console.log('Installation fetch completed/timed out:', error.message);
+          });
+        }
+        
+        function updateProgress() {
+          fetch('?action=progress', {
+            method: 'GET',
+            cache: 'no-cache'
+          })
+          .then(response => response.json())
+          .then(data => {
+            const step = data.step || 0;
+            const percent = data.percent || 0;
+            const message = data.message || 'Processing...';
+            
+            // Update progress bar
+            progressBar.style.width = percent + '%';
+            progressBar.setAttribute('aria-valuenow', percent);
+            progressBar.textContent = percent + '%';
+            
+            // Update message
+            progressMessage.textContent = message;
+            
+            // Update step info
+            if (step >= 0 && step < stepNames.length) {
+              stepInfo.textContent = 'Step ' + (step + 1) + ' of 5: ' + stepNames[step];
+            }
+            
+            // Add completed steps to log
+            if (!hasError && step > lastCompletedStep) {
+              for (let i = lastCompletedStep + 1; i <= step; i++) {
+                if (i >= 0 && i < stepNames.length) {
+                  addStepToLog(stepNames[i], true);
+                }
+              }
+              lastCompletedStep = step;
+            }
+            
+            // Store current step for error handling
+            progressBar.setAttribute('data-current-step', step);
+            
+            // Change color based on completion
+            if (percent === 100 && step === 4) {
+              progressBar.classList.remove('progress-bar-animated');
+              progressBar.classList.remove('bg-danger');
+              progressBar.classList.add('bg-success');
+              
+              // Show completion message
+              if (completionMessage) {
+                completionMessage.classList.remove('d-none');
+              }
+              if (statusMessages) {
+                statusMessages.classList.add('d-none');
+              }
+            }
+            
+            // Continue polling if not complete
+            if (!(percent === 100 && step === 4)) {
+              setTimeout(updateProgress, 500);
+            }
+          })
+          .catch(error => {
+            console.error('Progress update failed:', error);
+            setTimeout(updateProgress, 1000); // Retry on error
+          });
+        }
+        
+        // Start installation and polling
+        startInstallation();
+        updateProgress();
+      })();
+    </script>
   </body>
 </html>
 <?php
+  /**
+   * Execute the installation process
+   */
+  function executeInstallation(string $server, ?string $channel, ?string $stability) {
+    // Installation progress distribution (5 steps total, 20% each):
+    // Step 0 (0-20%):   Preparing download
+    // Step 1 (20-40%):  Downloading package with real-time progress
+    // Step 2 (40-60%):  Validating archive integrity
+    // Step 3 (60-80%):  Extracting files to destination
+    // Step 4 (80-100%): Cleaning up temporary files
+    
+    // Set unlimited execution time for installation
+    set_time_limit(0);
+    ini_set('max_execution_time', '0');
+    
+    // Get package data
+    $pkgData = lastPkg($server, $channel, $stability);
+    
+    if (!$pkgData || !isset($pkgData['url']) || !filter_var($pkgData['url'], FILTER_VALIDATE_URL)) {
+      header('Content-Type: application/json');
+      echo json_encode(array('success' => false, 'error' => 'Invalid package URL'));
+      exit;
+    }
+    
+    $pkgUrl = $pkgData['url'];
+    
+    // Verify authorized domain
+    $authorizedDomains = ['update.joomla.org', 'downloads.joomla.org', 'developer.joomla.org', 'github.com'];
+    $urlParts = parse_url($pkgUrl);
+    if (!in_array($urlParts['host'], $authorizedDomains)) {
+      header('Content-Type: application/json');
+      echo json_encode(array('success' => false, 'error' => 'Unauthorized domain'));
+      exit;
+    }
+    
+    $pkgFileName = basename($pkgUrl);
+    
+    // File name validation
+    if (!preg_match('/^[a-zA-Z0-9._-]+\\.zip$/', $pkgFileName)) {
+      header('Content-Type: application/json');
+      echo json_encode(array('success' => false, 'error' => 'Invalid file name'));
+      exit;
+    }
+    
+    $pkgPath = getcwd() . DIRECTORY_SEPARATOR . $pkgFileName;
+    
+    // Initialize progress tracking
+    $_SESSION['install_progress'] = array(
+      'step' => 0,
+      'message' => 'Preparing download...',
+      'percent' => 20
+    );
+    session_write_close();
+    
+    // Download with cURL and progress tracking
+    $fp = fopen($pkgPath, 'w+');
+    if ($fp === false) {
+      header('Content-Type: application/json');
+      echo json_encode(array('success' => false, 'error' => 'Unable to create file'));
+      exit;
+    }
+    
+    $ch = curl_init($pkgUrl);
+    curl_setopt($ch, CURLOPT_FILE, $fp);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 300);
+    curl_setopt($ch, CURLOPT_USERAGENT, 'Joomla! Downloader');
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+    curl_setopt($ch, CURLOPT_NOPROGRESS, false);
+    curl_setopt($ch, CURLOPT_PROGRESSFUNCTION, function($resource, $download_size, $downloaded, $upload_size, $uploaded) {
+      if ($download_size > 0) {
+        $downloadPercent = ($downloaded / $download_size);
+        // Map download progress from 20% to 40% (step 1 occupies 20% of total)
+        $totalPercent = 20 + round($downloadPercent * 20);
+        // Ensure it doesn't exceed 40%
+        $totalPercent = min($totalPercent, 40);
+        
+        session_start();
+        $_SESSION['install_progress'] = array(
+          'step' => 1,
+          'message' => 'Downloading package...',
+          'percent' => $totalPercent
+        );
+        session_write_close();
+      }
+    });
+    
+    $result = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    fclose($fp);
+    
+    if ($result === false || $httpCode !== 200) {
+      @unlink($pkgPath);
+      header('Content-Type: application/json');
+      echo json_encode(array('success' => false, 'error' => 'Unable to download file'));
+      exit;
+    }
+    
+    session_start();
+    $_SESSION['install_progress'] = array(
+      'step' => 1,
+      'message' => 'Download completed',
+      'percent' => 40
+    );
+    session_write_close();
+    
+    // Validate and extract
+    session_start();
+    $_SESSION['install_progress'] = array(
+      'step' => 2,
+      'message' => 'Validating archive...',
+      'percent' => 60
+    );
+    session_write_close();
+    
+    $zip = new ZipArchive;
+    $res = $zip->open($pkgPath);
+    if ($res === TRUE) {
+      $extractPath = getcwd() . DIRECTORY_SEPARATOR;
+      
+      for ($i = 0; $i < $zip->numFiles; $i++) {
+        $filename = $zip->getNameIndex($i);
+        
+        if (strpos($filename, '..') !== false || strpos($filename, '/') === 0) {
+          $zip->close();
+          unlink($pkgPath);
+          header('Content-Type: application/json');
+          echo json_encode(array('success' => false, 'error' => 'Archive contains unsafe paths'));
+          exit;
+        }
+      }
+      
+      $totalFiles = $zip->numFiles;
+      
+      // Extract files with progress tracking
+      for ($i = 0; $i < $totalFiles; $i++) {
+        $filename = $zip->getNameIndex($i);
+        
+        // Extract single file
+        $zip->extractTo($extractPath, $filename);
+        
+        // Update progress every 50 files or on last file to avoid too many session writes
+        if ($i % 50 === 0 || $i === $totalFiles - 1) {
+          $extractPercent = ($i / $totalFiles);
+          // Map extraction progress from 60% to 80% (step 3 occupies 20% of total)
+          $totalPercent = 60 + round($extractPercent * 20);
+          
+          session_start();
+          $_SESSION['install_progress'] = array(
+            'step' => 3,
+            'message' => 'Extracting files... (' . ($i + 1) . '/' . $totalFiles . ')',
+            'percent' => $totalPercent
+          );
+          session_write_close();
+        }
+      }
+      
+      $zip->close();
+    } else {
+      unlink($pkgPath);
+      header('Content-Type: application/json');
+      echo json_encode(array('success' => false, 'error' => 'Unable to open ZIP archive'));
+      exit;
+    }
+    
+    // Cleanup
+    session_start();
+    $_SESSION['install_progress'] = array(
+      'step' => 4,
+      'message' => 'Cleaning up...',
+      'percent' => 80
+    );
+    session_write_close();
+    
+    // Give polling time to capture step 4
+    usleep(500000); // 0.5 seconds
+    
+    if (file_exists($pkgPath)) {
+      @unlink($pkgPath);
+    }
+    
+    session_start();
+    $_SESSION['install_progress'] = array(
+      'step' => 4,
+      'message' => 'Installation completed!',
+      'percent' => 100
+    );
+    session_write_close();
+    
+    header('Content-Type: application/json');
+    echo json_encode(array('success' => true, 'message' => 'Installation completed successfully'));
+  }
+
   function lastPkg(string $server, ?string $channel = null, ?string $stability = null) : array {
     //Joomla! Core update servers
     $updateUrls = array(
@@ -444,16 +843,20 @@ if( !$server && !$clear ) {
    * Parse JSON targets endpoint with TUF format
    */
   function parseTargetsJson(string $url, string $server, ?string $channel, ?string $stability) : array {
-    $context = stream_context_create(array(
-      'http' => array(
-        'header' => 'Accept: application/json',
-        'timeout' => 30,
-        'user_agent' => 'Joomla! Downloader'
-      )
-    ));
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+    curl_setopt($ch, CURLOPT_USERAGENT, 'Joomla! Downloader');
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Accept: application/json'));
     
-    $jsonContent = file_get_contents($url, false, $context);
-    if ($jsonContent === false) {
+    $jsonContent = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($jsonContent === false || $httpCode !== 200) {
       return array();
     }
     
@@ -496,7 +899,7 @@ if( !$server && !$clear ) {
         continue;
       }
       
-      // Test URLs and find first working one (with multiple patterns)
+      // Find valid download URL with optimized pattern matching
       $validUrl = null;
       foreach ($downloads as $download) {
         if (!isset($download['url'])) {
@@ -510,53 +913,25 @@ if( !$server && !$clear ) {
           continue;
         }
         
-        // Test multiple URL patterns for maximum compatibility
-        $urlsToTest = [];
+        // Convert Update_Package to Full_Package (simple replacement)
+        $fullPackageUrl = str_replace('-Update_Package.zip', '-Full_Package.zip', $url);
         
-        // Pattern 1: Direct Full Package URL (works for most cases)
-        $fullPackageUrl = str_replace('Update_Package.zip', 'Full_Package.zip', $url);
-        $urlsToTest[] = $fullPackageUrl;
-        
-        // Pattern 2: update.joomla.org format (for downloads.joomla.org URLs)
-        if (strpos($url, 'downloads.joomla.org') !== false) {
-          // Extract version from URL like /5-1-2/ or /4-4-13/
+        // Prefer update.joomla.org mirror for stable releases (most reliable)
+        if ($targetStability === 'stable' && strpos($url, 'downloads.joomla.org') !== false) {
+          // Extract version from URL pattern /6-0-1/ or /5-4-1/
           if (preg_match('/\/(\d+-\d+-\d+)\//', $url, $matches)) {
-            $versionPath = str_replace('-', '.', $matches[1]);
-            $updateUrl = "https://update.joomla.org/releases/$versionPath/Joomla_$versionPath-Stable-Full_Package.zip";
-            $urlsToTest[] = $updateUrl;
+            $version = str_replace('-', '.', $matches[1]);
+            $fullPackageUrl = "https://update.joomla.org/releases/$version/Joomla_$version-Stable-Full_Package.zip";
           }
         }
         
-        // Pattern 3: GitHub releases pattern (for github.com URLs)
-        if (strpos($url, 'github.com') !== false) {
-          // GitHub pattern: change -Update_Package to -Full_Package
-          $githubUrl = str_replace('-Update_Package.zip', '-Full_Package.zip', $url);
-          if ($githubUrl !== $url) {
-            $urlsToTest[] = $githubUrl;
-          }
-        }
+        // Validate URL availability via HTTP HEAD request
+        $headers = @get_headers($fullPackageUrl, 1);
+        $urlExists = $headers && (strpos($headers[0], '200') !== false || strpos($headers[0], '302') !== false);
         
-        // Pattern 4: Alternative dash format
-        $altUrl = preg_replace('/Joomla_(\d+)\.(\d+)\.(\d+)/', 'Joomla_$1-$2-$3', $fullPackageUrl);
-        if ($altUrl !== $fullPackageUrl) {
-          $urlsToTest[] = $altUrl;
-        }
-        
-        // Test each URL pattern
-        foreach ($urlsToTest as $testUrl) {
-          $headers = @get_headers($testUrl, 1);
-          // Accept both 200 (OK) and 302 (Found/Redirect) as valid responses
-          $urlExists = $headers && (strpos($headers[0], '200') !== false || strpos($headers[0], '302') !== false);
-          
-          if ($urlExists) {
-            $validUrl = $testUrl;
-            break; // Stop at first working URL
-          }
-        }
-        
-        // If we found a valid URL, stop searching other downloads
-        if ($validUrl) {
-          break;
+        if ($urlExists) {
+          $validUrl = $fullPackageUrl;
+          break; // Use first download URL
         }
       }
       
@@ -625,16 +1000,20 @@ if( !$server && !$clear ) {
    * Parse XML endpoint (stable, maintenance, j4, j5, test, nightlies)
    */
   function parseXmlEndpoint(string $url, string $server, bool $isNightly) : array {
-    $context = stream_context_create(array(
-      'http' => array(
-        'header' => 'Accept: application/xml',
-        'timeout' => 30,
-        'user_agent' => 'Joomla!LABS Downloader'
-      )
-    ));
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+    curl_setopt($ch, CURLOPT_USERAGENT, 'Joomla! Downloader');
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Accept: application/xml'));
     
-    $xmlContent = file_get_contents($url, false, $context);
-    if ($xmlContent === false) {
+    $xmlContent = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($xmlContent === false || $httpCode !== 200) {
       return array();
     }
     
@@ -694,51 +1073,23 @@ if( !$server && !$clear ) {
         continue;
       }
       
-      // Test multiple URL patterns for maximum compatibility
-      $urlsToTest = [];
+      // Convert Update_Package to Full_Package (simple replacement)
+      $validUrl = str_replace('-Update_Package.zip', '-Full_Package.zip', $url);
       
-      // Pattern 1: Direct Full Package URL (works for most cases)
-      $fullPackageUrl = str_replace('Update_Package.zip', 'Full_Package.zip', $url);
-      $urlsToTest[] = $fullPackageUrl;
-      
-      // Pattern 2: update.joomla.org format (for downloads.joomla.org URLs)
-      if (strpos($url, 'downloads.joomla.org') !== false) {
-        // Extract version from URL like /5-3-3/ or /4-4-13/
+      // For downloads.joomla.org URLs, prefer update.joomla.org mirror (more reliable)
+      if (!$isNightly && strpos($url, 'downloads.joomla.org') !== false) {
+        // Extract version from URL pattern /6-0-1/ or /5-4-1/
         if (preg_match('/\/(\d+-\d+-\d+)\//', $url, $matches)) {
-          $versionPath = str_replace('-', '.', $matches[1]);
-          $updateUrl = "https://update.joomla.org/releases/$versionPath/Joomla_$versionPath-Stable-Full_Package.zip";
-          $urlsToTest[] = $updateUrl;
+          $versionNum = str_replace('-', '.', $matches[1]);
+          $validUrl = "https://update.joomla.org/releases/$versionNum/Joomla_$versionNum-Stable-Full_Package.zip";
         }
       }
       
-      // Pattern 3: GitHub releases pattern (for github.com URLs)
-      if (strpos($url, 'github.com') !== false) {
-        // GitHub pattern: change -Update_Package to -Full_Package
-        $githubUrl = str_replace('-Update_Package.zip', '-Full_Package.zip', $url);
-        if ($githubUrl !== $url) {
-          $urlsToTest[] = $githubUrl;
-        }
-      }
+      // Validate URL availability via HTTP HEAD request
+      $headers = @get_headers($validUrl, 1);
+      $urlExists = $headers && (strpos($headers[0], '200') !== false || strpos($headers[0], '302') !== false);
       
-      // Pattern 4: Alternative dash format
-      $altUrl = preg_replace('/Joomla_(\d+)\.(\d+)\.(\d+)/', 'Joomla_$1-$2-$3', $fullPackageUrl);
-      if ($altUrl !== $fullPackageUrl) {
-        $urlsToTest[] = $altUrl;
-      }
-      
-      $validUrl = null;
-      foreach ($urlsToTest as $testUrl) {
-        $headers = @get_headers($testUrl, 1);
-        // Accept both 200 (OK) and 302 (Found/Redirect) as valid responses
-        $urlExists = $headers && (strpos($headers[0], '200') !== false || strpos($headers[0], '302') !== false);
-        
-        if ($urlExists) {
-          $validUrl = $testUrl;
-          break; // Stop at first working URL
-        }
-      }
-      
-      if ($validUrl) {
+      if ($urlExists) {
         // Extract infourl with title attribute
         $infourl = '';
         if (isset($update->infourl)) {
