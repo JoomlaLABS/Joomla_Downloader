@@ -2,6 +2,26 @@
   session_start();
   $thisRelease = 'v2.5.0';
   
+  // Configuration: packages to display on main page
+  $packagesConfig = array(
+    // Stable releases
+    array('server' => 'targets'),                      // Latest Joomla! stable
+    array('server' => 'targets', 'channel' => '5.x'),  // Joomla! 5.x LTS
+    # array('server' => 'j5'),                         // Joomla! 5.4
+    # array('server' => 'j4'),                         // Joomla! 4.4
+    # array('server' => 'stable'),                     // Joomla! 4.4
+    # array('server' => 'maintenance'),                // Joomla! 3.10
+    
+    // Pre-releases
+    array('server' => 'targets', 'stability' => 'RC'), // Release Candidates
+    # array('server' => 'test'),                       // Joomla! 5.1 RC
+    
+    // Nightly builds
+    array('server' => 'nightly-major'),
+    array('server' => 'nightly-minor'),
+    array('server' => 'nightly-patch'),
+  );
+  
   // AJAX endpoint for progress tracking
   if (isset($_GET['action']) && $_GET['action'] === 'progress') {
     header('Content-Type: application/json');
@@ -16,7 +36,7 @@
     $stability = isset($_GET['stability']) ? trim($_GET['stability']) : null;
     
     // Validation
-    $allowedServers = array('targets', 'nightly-major', 'nightly-minor', 'nightly-patch');
+    $allowedServers = array('targets', 'stable', 'maintenance', 'j4', 'j5', 'test', 'nightly-major', 'nightly-minor', 'nightly-patch');
     if (!$server || !in_array($server, $allowedServers)) {
       header('Content-Type: application/json');
       echo json_encode(array('success' => false, 'error' => 'Invalid server parameter'));
@@ -32,14 +52,18 @@
   if (isset($_GET['action']) && $_GET['action'] === 'get_packages') {
     header('Content-Type: application/json');
     
-    // Get all packages
+    // Get packages based on configuration
     $pkgs = array();
-    $pkgs[] = lastPkg('targets');
-    $pkgs[] = lastPkg('targets', '5.x');
-    $pkgs[] = lastPkg('targets', null, 'RC');
-    $pkgs[] = lastPkg('nightly-major');
-    $pkgs[] = lastPkg('nightly-minor');
-    $pkgs[] = lastPkg('nightly-patch');
+    foreach ($packagesConfig as $config) {
+      $server = $config['server'];
+      $channel = isset($config['channel']) ? $config['channel'] : null;
+      $stability = isset($config['stability']) ? $config['stability'] : null;
+      
+      $pkg = lastPkg($server, $channel, $stability);
+      if (!empty($pkg)) {
+        $pkgs[] = $pkg;
+      }
+    }
     
     // Save reference to last targets call for icon comparison
     $lastTargetsPkg = lastPkg('targets');
@@ -132,7 +156,7 @@
     </header>
 <?php
 // Validation and sanitization of GET parameters
-$allowedServers = array('targets', 'nightly-major', 'nightly-minor', 'nightly-patch');
+$allowedServers = array('targets', 'stable', 'maintenance', 'j4', 'j5', 'test', 'nightly-major', 'nightly-minor', 'nightly-patch');
 $server = isset($_GET['server']) ? trim($_GET['server']) : null;
 $channel = isset($_GET['channel']) ? trim($_GET['channel']) : null;
 $stability = isset($_GET['stability']) ? trim($_GET['stability']) : null;
