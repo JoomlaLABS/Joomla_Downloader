@@ -1,6 +1,6 @@
 # Joomla! Downloader
 
-![image](https://user-images.githubusercontent.com/906604/235441118-ec1a1812-3f15-4b24-bc41-58c28b20b703.png)
+![image Joomla! Downloader](https://github.com/user-attachments/assets/aada9cab-5be7-43d8-801f-f113d175139d)
 
 ![GitHub all releases](https://img.shields.io/github/downloads/JoomlaLABS/Joomla_Downloader/total?style=for-the-badge&color=blue)
 ![GitHub release (latest by SemVer)](https://img.shields.io/github/downloads/JoomlaLABS/Joomla_Downloader/latest/total?style=for-the-badge&color=blue)
