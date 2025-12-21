@@ -6,7 +6,7 @@
 ![GitHub release (latest by SemVer)](https://img.shields.io/github/downloads/JoomlaLABS/Joomla_Downloader/latest/total?style=for-the-badge&color=blue)
 ![GitHub release (latest by SemVer)](https://img.shields.io/github/v/release/JoomlaLABS/Joomla_Downloader?sort=semver&style=for-the-badge&color=blue)
 
-[![License](https://img.shields.io/badge/license-GPL%202.0%2B-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-GPL%202.0%2B-green.svg)](LICENSE)
 [![PHP Version](https://img.shields.io/badge/PHP-7.4%2B-777BB4?logo=php&logoColor=white)](https://www.php.net/)
 
 ## Description
