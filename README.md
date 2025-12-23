@@ -9,7 +9,7 @@
 [![License](https://img.shields.io/badge/license-GPL%202.0%2B-green.svg)](LICENSE)
 [![PHP Version](https://img.shields.io/badge/PHP-7.4%2B-777BB4?logo=php&logoColor=white)](https://www.php.net/)
 
-## Description
+## 📖 Description
 
 **Joomla! Downloader** is a smart, single-file PHP script that revolutionizes the Joomla! installation process. Built to save time and simplify deployment, it automatically downloads and installs the latest version of Joomla! directly on your server with just one click - no FTP uploads, no manual downloads, no waiting.
 
