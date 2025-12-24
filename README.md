@@ -297,7 +297,6 @@ GNU General Public License for more details.
 
 **Luca Racchetti** - Lead Developer
 
-[![Email](https://img.shields.io/badge/Email-Razzo1987%40gmail.com-red?style=for-the-badge&logo=gmail&logoColor=white)](mailto:Razzo1987@gmail.com)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Luca%20Racchetti-blue?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/razzo/)
 [![GitHub](https://img.shields.io/badge/GitHub-Razzo1987-black?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Razzo1987)
 
