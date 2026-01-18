@@ -1,6 +1,6 @@
 <?php
   session_start();
-  $thisRelease = 'v2.5.0';
+  $thisRelease = 'v2.6.0';
   
   // Configuration: packages to display on main page
   $packagesConfig = array(
