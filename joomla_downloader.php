@@ -12,9 +12,10 @@
     # array('server' => 'stable'),                     // Joomla! 4.4
     # array('server' => 'maintenance'),                // Joomla! 3.10
     
-    // Pre-releases
-    array('server' => 'targets', 'stability' => 'RC'), // Release Candidates
-    # array('server' => 'test'),                       // Joomla! 5.1 RC
+    // Release Candidates
+    array('server' => 'targets', 'stability' => 'RC'),                     // Latest Release Candidate
+    array('server' => 'targets', 'channel' => '5.x', 'stability' => 'RC'), // Joomla! 5.x Release Candidate
+    # array('server' => 'test'),                                           // Joomla! 5.1 RC
     
     // Nightly builds
     array('server' => 'nightly-major'),
@@ -179,8 +180,30 @@ if( !$server && !$clear ) {
       </div>
       
       <!-- Packages Container (initially hidden) -->
-      <div id="packagesContainer" class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 py-4 m-0" style="display: none;">
-        <!-- Cards will be inserted here by JavaScript -->
+      <div id="packagesContainer" class="container-fluid py-4" style="display: none;">
+        <!-- Stable Releases Section -->
+        <div id="stableSection" class="mb-5" style="display: none;">
+          <h2 class="mb-4 text-success text-center"><i class="fa-solid fa-box"></i> Stable Releases</h2>
+          <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 justify-content-center" id="stableCards">
+            <!-- Stable release cards will be inserted here -->
+          </div>
+        </div>
+        
+        <!-- Pre-releases / Release Candidates Section -->
+        <div id="rcSection" class="mb-5" style="display: none;">
+          <h2 class="mb-4 text-info text-center"><i class="fa-solid fa-vial"></i> Release Candidates</h2>
+          <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 justify-content-center" id="rcCards">
+            <!-- RC cards will be inserted here -->
+          </div>
+        </div>
+        
+        <!-- Nightly Builds Section -->
+        <div id="nightlySection" class="mb-5" style="display: none;">
+          <h2 class="mb-4 text-warning text-center"><i class="fa-solid fa-moon"></i> Nightly Builds</h2>
+          <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 justify-content-center" id="nightlyCards">
+            <!-- Nightly build cards will be inserted here -->
+          </div>
+        </div>
       </div>
     </main>
     
@@ -193,7 +216,24 @@ if( !$server && !$clear ) {
           const container = document.getElementById('packagesContainer');
           const spinner = document.getElementById('loadingSpinner');
           
+          // Separate packages by category
+          const stablePackages = [];
+          const rcPackages = [];
+          const nightlyPackages = [];
+          
           packages.forEach(pkg => {
+            // Categorize based on iconType
+            if (pkg.iconType.startsWith('nightly-')) {
+              nightlyPackages.push(pkg);
+            } else if (pkg.iconType === 'test' || pkg.stability.toLowerCase() === 'rc') {
+              rcPackages.push(pkg);
+            } else {
+              stablePackages.push(pkg);
+            }
+          });
+          
+          // Function to generate card HTML
+          function generateCardHTML(pkg) {
             // Generate icon HTML based on iconType
             let iconHTML = '';
             switch(pkg.iconType) {
@@ -239,8 +279,8 @@ if( !$server && !$clear ) {
             const infoButtonHTML = pkg.infourl ? 
               `<a href="${pkg.infourl.url}" target="_blank" class="btn btn-outline-info" style="z-index: 10;"><i class="fa-solid fa-circle-info"></i> ${pkg.infourl.title}</a>` : '';
             
-            // Create card HTML
-            const cardHTML = `
+            // Return card HTML
+            return `
               <div class="col">
                 <div id="${pkg.id}" class="card mb-4 h-100">
                   <div class="row g-0">
@@ -271,13 +311,41 @@ if( !$server && !$clear ) {
                 </div>
               </div>
             `;
-            
-            container.insertAdjacentHTML('beforeend', cardHTML);
-          });
+          }
           
-          // Hide spinner and show packages
+          // Render stable packages
+          if (stablePackages.length > 0) {
+            const stableSection = document.getElementById('stableSection');
+            const stableCardsContainer = document.getElementById('stableCards');
+            stablePackages.forEach(pkg => {
+              stableCardsContainer.insertAdjacentHTML('beforeend', generateCardHTML(pkg));
+            });
+            stableSection.style.display = 'block';
+          }
+          
+          // Render RC packages
+          if (rcPackages.length > 0) {
+            const rcSection = document.getElementById('rcSection');
+            const rcCardsContainer = document.getElementById('rcCards');
+            rcPackages.forEach(pkg => {
+              rcCardsContainer.insertAdjacentHTML('beforeend', generateCardHTML(pkg));
+            });
+            rcSection.style.display = 'block';
+          }
+          
+          // Render nightly packages
+          if (nightlyPackages.length > 0) {
+            const nightlySection = document.getElementById('nightlySection');
+            const nightlyCardsContainer = document.getElementById('nightlyCards');
+            nightlyPackages.forEach(pkg => {
+              nightlyCardsContainer.insertAdjacentHTML('beforeend', generateCardHTML(pkg));
+            });
+            nightlySection.style.display = 'block';
+          }
+          
+          // Hide spinner and show packages container
           spinner.style.display = 'none';
-          container.style.display = 'flex';
+          container.style.display = 'block';
         })
         .catch(error => {
           console.error('Error loading packages:', error);
