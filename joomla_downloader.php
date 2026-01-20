@@ -1,6 +1,6 @@
 <?php
   session_start();
-  $thisRelease = 'v2.6.0';
+  $thisRelease = 'v2.6.1';
   
   // Configuration: packages to display on main page
   $packagesConfig = array(
@@ -13,9 +13,11 @@
     # array('server' => 'maintenance'),                // Joomla! 3.10
     
     // Release Candidates
-    array('server' => 'targets', 'stability' => 'RC'),                     // Latest Release Candidate
-    array('server' => 'targets', 'channel' => '5.x', 'stability' => 'RC'), // Joomla! 5.x Release Candidate
-    # array('server' => 'test'),                                           // Joomla! 5.1 RC
+    array('server' => 'targets', 'stability' => 'RC'),                          // Latest Release Candidate
+    array('server' => 'targets', 'channel' => '5.x', 'stability' => 'RC'),      // Joomla! 5.x Release Candidate
+    # array('server' => 'targets', 'stability' => 'Alpha'),                     // Latest Alpha Release
+    # array('server' => 'targets', 'channel' => '6.x', 'stability' => 'Alpha'), // Joomla! 6.x Alpha Release
+    # array('server' => 'test'),                                                // Joomla! 5.1 RC
     
     // Nightly builds
     array('server' => 'nightly-major'),
@@ -90,7 +92,7 @@
       if (in_array($server, ['nightly-major', 'nightly-minor', 'nightly-patch'])) {
         $color = 'text-warning';
         $iconType = $server; // nightly-major, nightly-minor, nightly-patch
-      } elseif ($server === 'test' || strtolower($stability) === 'rc' || strtolower($branch) === 'test') {
+      } elseif ($server === 'test' || strtolower($stability) === 'rc' || strtolower($stability) === 'alpha' || strtolower($branch) === 'test') {
         $color = 'text-info';
         $iconType = 'test';
       } elseif (in_array($server, ['stable', 'maintenance', 'j4', 'j5'])) {
@@ -141,7 +143,7 @@
     <meta name="description" content="">
     <meta name="author" content="Joomla!LABS">
     <link  rel="shortcut icon" href="data:image/x-icon;base64,AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAAAACMuAAAjLgAAAAAAAAAAAADNkFBLzZFR5c2QUPLNkVGWAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA0QO+CNUDv8TVA7+s1QPBfzZFR+s2QUP/MkFD/zZFR/8yQUJnNkFGB0pQxRwAAAAAAAAAALDXuUTVA8IQ1QO+KND/v/zVA7/81QO//NUDv/82RUf/NkVH/zZFR/82RUf/NkFD/zZFR/9CTO//HkU96Nz/tdCMb7f83Q+//NEDv/zVA7/80QO//NEDv/zRA7//NkFBgzZFR982RUf/OklH/y45R1MaHTrLJilH/1JYc/6aHf9gqLu7GJBvtvDE77+M3Q/D/NUDv/zVA7/41QPB2AAAAAM2QUXnNkVH/y45Q4AAAAAAAAAAAqp9ftMWFUf/XmQD/sYx2qAAAAAAAAAAAMDvv8DRA7/81QO9sAAAAAAAAAADNkFBlzZFR/8KCT9UAAAAAP8SHrELDf+irnF/Tx4lV/9SWCv/jogCBAAAAACQc7e41QO//NEDvRAAAAAAAAAAAyYpRJ8SET//GjVHZWrl5wELCfP9Ev3L/Tb1nT9GTK2zXmAD/vY5h10NO2skqLO7/NTDu/zUt7hUAAAAAAAAAAAAAAACxl1tEY7h24UHCfv9GvGT/P8GMWgAAAAAAAAAAq4V4XzxF5+AlG+3/ODLu9jNN8DAAAAAAAAAAAAAAAAAAAAAAQcJ9hELDf/9Gulz/Nrmv0xuh73oAAAAAAAAAAC8n7qQpLO7/OSPt/y1w8dEYqfdjAAAAAAAAAAAAAAAAQsF7P0LCfP9Gu175N7ipjxyO8+0anPT/G5z1kiw27ogyGu7/NyPu/y9m8IUTs/fyFqn3/xik9igAAAAAAAAAAEPCe2VDwnv/R7pbywAAAAAdjfNeG5Pz/Baq9/8hlvXeNTDuxTcZ7kEAAAAAE6/28Rqe9f8Zn/VEAAAAAAAAAABCwXp+QsF6/0LBee5Ev3InAAAAACms0LAcjvL8Fa74/yGT9a8AAAAAGKX2Oxmf9fcZn/X/GaD1dQAAAABCwXpzQsF7/0LBev9Cwn3/Q8F6/0e5Vv1HulrzK63LzhuV9P8Xqvf/Fa749xmf9f8Zn/X/GZ/1/xmg9f8Zn/WIQsF6/0LBe/9Dwnv/QsF6/0LBe/9Bwn3/Rrtf90LCfEIbnvNRGpr09hmf9f8aoPb/GqD2/xmf9f8ZoPb/GZ/1/0LBeudCwXv/QsF7/0LBe/9CwXpoQsF6QkS9axAAAAAAAAAAABqb9RcZn/VEGZ/1Vhqg9v8Zn/X/GaD2/xmf9fdCwXszQsF61kLBeuxCwXp+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAZn/VsGaD16hmg9d8Zn/VEj/EAAAPAAAABgAAAgAEAAMwzAADIEwAAwYMAAOPHAADDhwAAwAMAAMwzAADMMwAAgAAAAAGAAAAP8AAAn/kAAA==" type="image/vnd.microsoft.icon" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" integrity="sha384-KK94CHFLLe+nY2dmCWGMq91rCGa5gtU4mk92HdvYe+M/SXH301p5ILy+dN9+nJOZ" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/solid.min.css" integrity="sha512-yDUXOUWwbHH4ggxueDnC5vJv4tmfySpVdIcN1LksGZi8W8EVZv4uKGrQc0pVf66zS7LDhFJM7Zdeow1sw1/8Jw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/brands.min.css" integrity="sha512-9YHSK59/rjvhtDcY/b+4rdnl0V4LPDWdkKceBl8ZLF5TB6745ml1AfluEU6dFWqwDw9lPvnauxFgpKvJqp7jiQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/fontawesome.min.css" integrity="sha512-SgaqKKxJDQ/tAUAAXzvxZz33rmn7leYDYfBP+YoMRSENhf3zJyx3SBASt/OfeQwBHA1nxMis7mM3EV/oYT6Fdw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
@@ -191,7 +193,7 @@ if( !$server && !$clear ) {
         
         <!-- Pre-releases / Release Candidates Section -->
         <div id="rcSection" class="mb-5" style="display: none;">
-          <h2 class="mb-4 text-info text-center"><i class="fa-solid fa-vial"></i> Release Candidates</h2>
+          <h2 class="mb-4 text-info text-center"><i class="fa-solid fa-vial"></i> Pre-releases</h2>
           <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 justify-content-center" id="rcCards">
             <!-- RC cards will be inserted here -->
           </div>
@@ -225,7 +227,7 @@ if( !$server && !$clear ) {
             // Categorize based on iconType
             if (pkg.iconType.startsWith('nightly-')) {
               nightlyPackages.push(pkg);
-            } else if (pkg.iconType === 'test' || pkg.stability.toLowerCase() === 'rc') {
+            } else if (pkg.iconType === 'test' || pkg.stability.toLowerCase() === 'rc' || pkg.stability.toLowerCase() === 'alpha') {
               rcPackages.push(pkg);
             } else {
               stablePackages.push(pkg);
@@ -567,7 +569,7 @@ if( !$server && !$clear ) {
       </div>
     </footer>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ENjdO4Dr2bkBIFxQpeoTz1HIcje39Wm4jDKdf19U8gI4ddQ3GYNS7NTKfAdVQSZe" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     
     <script>
       // Progress tracking with AJAX polling
